@@ -223,7 +223,18 @@ public class FrameworkParsingPackageUtils {
                 continue;
             }
             // 3. Check if prop is equal to expected value.
-            if (!currValue.equals(propValues[i])) {
+            final String value = propValues[i];
+            if (value.startsWith("+")) {
+                try {
+                    final java.util.regex.Pattern regex = java.util.regex.Pattern.compile(value.substring(1).replace("*", ".*"));
+                    java.util.regex.Matcher matcher = regex.matcher(currValue);
+                    if (!matcher.find()) {
+                        return false;
+                    }
+                } catch (java.util.regex.PatternSyntaxException e) {
+                    return false;
+                }
+            } else if (!currValue.equals(value)) {
                 return false;
             }
         }
