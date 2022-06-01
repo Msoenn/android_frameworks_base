@@ -518,6 +518,11 @@ public class Camera {
      * @see #open(int)
      */
     public static Camera open() {
+        int altPrimaryCamera = SystemProperties.getInt("persist.sys.alt_primary_camera", -1);
+        if (altPrimaryCamera > 0) {
+            return open(altPrimaryCamera);
+        }
+
         int numberOfCameras = getNumberOfCameras();
         CameraInfo cameraInfo = new CameraInfo();
         for (int i = 0; i < numberOfCameras; i++) {
