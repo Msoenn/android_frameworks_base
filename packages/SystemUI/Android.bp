@@ -592,6 +592,10 @@ android_library {
         "displaylib",
         "aconfig_settings_flags_lib",
         "vendor.lineage.powershare-V1-java",
+        "vendor.goodix.hardware.biometrics.fingerprint-V2.1-java",
+        "vendor.xiaomi.hw.touchfeature-V1.0-java",
+        "vendor.xiaomi.hardware.fingerprintextension-V1.0-java",
+        "vendor.nubia.ifaa-V1.0-java",
     ],
     javacflags: [
         "-Aroom.schemaLocation=frameworks/base/packages/SystemUI/schemas",
