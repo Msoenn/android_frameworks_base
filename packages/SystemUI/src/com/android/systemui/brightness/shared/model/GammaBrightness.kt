@@ -16,7 +16,6 @@
 
 package com.android.systemui.brightness.shared.model
 
-import androidx.annotation.IntRange
 import com.android.settingslib.display.BrightnessUtils
 import com.android.systemui.log.table.TableLogBuffer
 import com.android.systemui.util.kotlin.pairwiseBy
@@ -24,12 +23,14 @@ import kotlinx.coroutines.flow.Flow
 
 @JvmInline
 value class GammaBrightness(
-    @IntRange(
-        from = BrightnessUtils.GAMMA_SPACE_MIN.toLong(),
-        to = BrightnessUtils.GAMMA_SPACE_MAX.toLong()
-    )
     val value: Int
-)
+) {
+    init {
+        require(value == -1 || value in BrightnessUtils.GAMMA_SPACE_MIN..BrightnessUtils.GAMMA_SPACE_MAX) {
+            "Value must be in range ${BrightnessUtils.GAMMA_SPACE_MIN} to ${BrightnessUtils.GAMMA_SPACE_MAX}"
+        }
+    }
+}
 
 internal fun Flow<GammaBrightness>.logDiffForTable(
     tableLogBuffer: TableLogBuffer,
