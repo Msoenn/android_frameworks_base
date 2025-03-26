@@ -1083,8 +1083,24 @@ public class AuthService extends SystemService {
     private void registerAuthenticators() {
         BiometricHandlerProvider handlerProvider = mInjector.getBiometricHandlerProvider();
 
+        String[] configStrings = mInjector.getFingerprintConfiguration(getContext());
+        if (configStrings == null || configStrings.length == 0) {
+            Slog.i("PHH", "Attempting to generate config_biometric_sensors for fingerprint");
+            final int firstApiLevel = SystemProperties.getInt(SYSPROP_FIRST_API_LEVEL, 0);
+            final int apiLevel = SystemProperties.getInt(SYSPROP_API_LEVEL, firstApiLevel);
+            configStrings = mInjector.getConfiguration(getContext());
+            if (configStrings.length == 0) {
+                // For backwards compatibility with R where biometrics could work without being
+                // configured in config_biometric_sensors. In the absence of a vendor provided
+                // configuration, we assume the weakest biometric strength (i.e. convenience).
+                Slog.w(TAG, "Found vendor partition without config_biometric_sensors");
+                configStrings = generateRSdkCompatibleConfiguration();
+            }
+        }
+        Slog.i("PHH", "config_biometric_sensors for fingerprint " + configStrings);
+
         registerFingerprintSensors(mInjector.getFingerprintAidlInstances(),
-                mInjector.getFingerprintConfiguration(getContext()), getContext(),
+                configStrings, getContext(),
                 mInjector.getFingerprintService(), handlerProvider);
         registerFaceSensors(mInjector.getFaceAidlInstances(),
                 mInjector.getFaceConfiguration(getContext()), getContext(),
@@ -1207,12 +1223,27 @@ public class AuthService extends SystemService {
             return;
         }
 
+        final boolean preferHidlSensor;
+        if (!SystemProperties.getBoolean("persist.sys.phh.virtual_sensors_are_real", false)) {
+            if (hidlConfigStrings != null && hidlConfigStrings.length > 0
+                    && fingerprintAidlInstances != null && fingerprintAidlInstances.length == 1
+                    && fingerprintAidlInstances[0].contains("virtual")) {
+
+                Slog.w(TAG, "Preferring HIDL fingerprint sensor over virtual AIDL sensor");
+                preferHidlSensor = true;
+            } else {
+                preferHidlSensor = false;
+            }
+        } else {
+            preferHidlSensor = false;
+        }
+
         handlerProvider.getFingerprintHandler().post(() -> {
             final FingerprintSensorConfigurations mFingerprintSensorConfigurations =
                     new FingerprintSensorConfigurations(fingerprintAidlInstances != null
-                            && fingerprintAidlInstances.length > 0);
+                            && fingerprintAidlInstances.length > 0 && !preferHidlSensor);
 
-            if (fingerprintAidlInstances != null && fingerprintAidlInstances.length > 0) {
+            if (fingerprintAidlInstances != null && fingerprintAidlInstances.length > 0 && !preferHidlSensor) {
                 mFingerprintSensorConfigurations.addAidlSensors(fingerprintAidlInstances);
             } else if (hidlConfigStrings != null && hidlConfigStrings.length > 0) {
                 mFingerprintSensorConfigurations.addHidlSensors(hidlConfigStrings, context);
