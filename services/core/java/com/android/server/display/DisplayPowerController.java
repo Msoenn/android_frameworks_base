@@ -1379,6 +1379,11 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
         final DisplayState displayState = mDisplayStateController.updateDisplayState(
                 mPowerRequest, mIsEnabled, mIsInTransition);
         int state = displayState.state();
+        boolean disableDisplayDozeSuspend = SystemProperties.get("persist.sys.phh.disable_display_doze_suspend", "0").equals("1");
+
+        if (disableDisplayDozeSuspend && state == Display.STATE_DOZE_SUSPEND) {
+            state = Display.STATE_DOZE;
+        }
 
         // Initialize things the first time the power state is changed.
         if (mustInitialize) {
