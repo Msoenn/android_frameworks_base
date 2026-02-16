@@ -646,6 +646,15 @@ public class TelephonyManager {
     /** @hide */
     @UnsupportedAppUsage
     public MultiSimVariants getMultiSimConfiguration() {
+        int simSlots = SystemProperties.getInt("persist.sys.phh.sim_slots", -1);
+        if (simSlots == 0 || simSlots == 1) {
+            return MultiSimVariants.UNKNOWN;
+        } else if (simSlots == 2) {
+            return MultiSimVariants.DSDS;
+        } else if (simSlots == 3) {
+            return MultiSimVariants.TSTS;
+        }
+
         String mSimConfig =
                 TelephonyProperties.multi_sim_config().orElse("");
         if (mSimConfig.equals("dsds")) {
@@ -687,6 +696,11 @@ public class TelephonyManager {
      * </ul>
      */
     public int getActiveModemCount() {
+        int simSlots = SystemProperties.getInt("persist.sys.phh.sim_slots", -1);
+        if (simSlots >= 0) {
+            return simSlots;
+        }
+
         int modemCount = 1;
         switch (getMultiSimConfiguration()) {
             case UNKNOWN:
@@ -715,6 +729,11 @@ public class TelephonyManager {
      * {@link #getActiveModemCount} returns 1 while this API returns 2.
      */
     public int getSupportedModemCount() {
+        int simSlots = SystemProperties.getInt("persist.sys.phh.sim_slots", -1);
+        if (simSlots >= 0) {
+            return simSlots;
+        }
+
         return TelephonyProperties.max_active_modems().orElse(getActiveModemCount());
     }
 
