@@ -3913,6 +3913,16 @@ public class SettingsProvider extends ContentProvider {
                     migrateLegacySettingsForUserLocked(dbHelper, database, userId,
                             Context.DEVICE_ID_DEFAULT);
 
+                    // Ensure SSAID settings state exists before running upgrade.
+                    // migrateLegacySettingsForUserLocked creates system, secure, and global
+                    // settings states, but not SSAID. The upgrade path (version 136->137)
+                    // calls getSsaidSettingsLocked() which returns null without this,
+                    // causing an NPE on devices upgrading from old vendor partitions
+                    // (e.g. GSI over Android 11 vendor).
+                    final long ssaidKey = makeKey(SETTINGS_TYPE_SSAID, userId,
+                            Context.DEVICE_ID_DEFAULT);
+                    ensureSettingsStateLocked(ssaidKey);
+
                     // Upgrade to the latest version.
                     UpgradeController upgrader = new UpgradeController(userId,
                             Context.DEVICE_ID_DEFAULT);
@@ -4758,17 +4768,28 @@ public class SettingsProvider extends ContentProvider {
                         }
 
                         final SettingsState ssaidSettings = getSsaidSettingsLocked(userId);
-                        for (PackageInfo info : packages) {
-                            // Check if the UID already has an entry in the table.
-                            final String uid = Integer.toString(info.applicationInfo.uid);
-                            final Setting ssaid = ssaidSettings.getSettingLocked(uid);
+                        if (ssaidSettings == null) {
+                            Slog.w(LOG_TAG, "SSAID settings not available for user "
+                                    + userId + ", skipping legacy SSAID migration");
+                        } else {
+                            for (PackageInfo info : packages) {
+                                // Check if the UID already has an entry in the table.
+                                final String uid =
+                                        Integer.toString(info.applicationInfo.uid);
+                                final Setting ssaid =
+                                        ssaidSettings.getSettingLocked(uid);
 
-                            if (ssaid.isNull() || ssaid.getValue() == null) {
-                                // Android Id doesn't exist for this package so create it.
-                                ssaidSettings.insertSettingOverrideableByRestoreLocked(
-                                        uid, legacySsaid, null, true, info.packageName);
-                                if (DEBUG) {
-                                    Slog.d(LOG_TAG, "Keep the legacy ssaid for uid=" + uid);
+                                if (ssaid.isNull() || ssaid.getValue() == null) {
+                                    // Android Id doesn't exist for this package so
+                                    // create it.
+                                    ssaidSettings
+                                            .insertSettingOverrideableByRestoreLocked(
+                                                    uid, legacySsaid, null, true,
+                                                    info.packageName);
+                                    if (DEBUG) {
+                                        Slog.d(LOG_TAG,
+                                                "Keep the legacy ssaid for uid=" + uid);
+                                    }
                                 }
                             }
                         }
