@@ -22,6 +22,7 @@ import android.content.res.Configuration;
 import android.graphics.Insets;
 import android.graphics.Rect;
 import android.graphics.Region;
+import android.os.SystemProperties;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.Display;
@@ -332,23 +333,36 @@ public class PhoneStatusBarView extends FrameLayout {
     }
 
     private void updatePaddings() {
-        int statusBarPaddingStart = getResources().getDimensionPixelSize(
-                R.dimen.status_bar_padding_start);
+        int statusBarPaddingTop = SystemProperties.getInt("persist.sys.phh.status_bar_padding_top", -1);
+        if(statusBarPaddingTop == -1)
+            statusBarPaddingTop = 0;
+
+        int statusBarPaddingStart = SystemProperties.getInt("persist.sys.phh.status_bar_padding_start", -1);
+        if(statusBarPaddingStart == -1)
+            statusBarPaddingStart = getResources().getDimensionPixelSize(R.dimen.status_bar_padding_start);
+
+        int statusBarPaddingEnd = SystemProperties.getInt("persist.sys.phh.status_bar_padding_end", -1);
+        if(statusBarPaddingEnd == -1)
+            statusBarPaddingEnd = getResources().getDimensionPixelSize(R.dimen.status_bar_padding_end);
+
+        int statusBarPaddingBottom = SystemProperties.getInt("persist.sys.phh.status_bar_padding_bottom", -1);
+        if(statusBarPaddingBottom == -1)
+            statusBarPaddingBottom = getResources().getDimensionPixelSize(R.dimen.status_bar_icons_padding_bottom);
 
         findViewById(R.id.status_bar_contents).setPaddingRelative(
-                statusBarPaddingStart,
-                getResources().getDimensionPixelSize(R.dimen.status_bar_padding_top),
-                getResources().getDimensionPixelSize(R.dimen.status_bar_padding_end),
+                (int) statusBarPaddingStart,
+                (int) statusBarPaddingTop,
+                (int) statusBarPaddingEnd,
                 0);
 
         findViewById(R.id.notification_lights_out)
                 .setPaddingRelative(0, statusBarPaddingStart, 0, 0);
 
         findViewById(R.id.system_icons).setPaddingRelative(
-                getResources().getDimensionPixelSize(R.dimen.status_bar_icons_padding_start),
-                getResources().getDimensionPixelSize(R.dimen.status_bar_icons_padding_top),
-                getResources().getDimensionPixelSize(R.dimen.status_bar_icons_padding_end),
-                getResources().getDimensionPixelSize(R.dimen.status_bar_icons_padding_bottom)
+                (int) statusBarPaddingStart,
+                (int) statusBarPaddingTop,
+                (int) statusBarPaddingEnd,
+                (int) statusBarPaddingBottom
         );
     }
 

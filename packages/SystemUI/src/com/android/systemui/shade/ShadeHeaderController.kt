@@ -26,6 +26,7 @@ import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Insets
 import android.os.Bundle
+import android.os.SystemProperties
 import android.os.Trace
 import android.os.Trace.TRACE_TAG_APP
 import android.provider.AlarmClock
@@ -712,7 +713,9 @@ constructor(
     }
 
     private fun updateResources() {
-        roundedCorners = resources.getDimensionPixelSize(R.dimen.rounded_corner_content_padding)
+        roundedCorners = SystemProperties.getInt("persist.sys.phh.rounded_corners_padding", -1);
+        if(roundedCorners == -1)
+            roundedCorners = resources.getDimensionPixelSize(R.dimen.rounded_corner_content_padding)
         val padding = resources.getDimensionPixelSize(R.dimen.qs_panel_padding)
         header.setPadding(padding, header.paddingTop, padding, header.paddingBottom)
         updateQQSPaddings()

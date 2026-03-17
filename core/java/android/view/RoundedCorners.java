@@ -31,6 +31,7 @@ import android.content.res.TypedArray;
 import android.graphics.Rect;
 import android.os.Parcel;
 import android.os.Parcelable;
+import android.os.SystemProperties;
 import android.util.DisplayUtils;
 import android.util.Pair;
 import android.view.RoundedCorner.Position;
@@ -197,6 +198,10 @@ public class RoundedCorners implements Parcelable {
         } else {
             radius = res.getDimensionPixelSize(R.dimen.rounded_corner_radius);
         }
+        int syspropRadius = SystemProperties.getInt("persist.sys.phh.rounded_corners_padding", -1);
+        if (syspropRadius >= 0) {
+            radius = syspropRadius;
+        }
         array.recycle();
         // For devices with round displays (e.g. watches) that don't otherwise provide the rounded
         // corner radius via resource overlays, we can infer the corner radius directly from the
@@ -225,6 +230,10 @@ public class RoundedCorners implements Parcelable {
         } else {
             radius = res.getDimensionPixelSize(R.dimen.rounded_corner_radius_top);
         }
+        int syspropRadius = SystemProperties.getInt("persist.sys.phh.rounded_corners_padding", -1);
+        if (syspropRadius >= 0) {
+            radius = syspropRadius;
+        }
         array.recycle();
         return radius;
     }
@@ -247,6 +256,10 @@ public class RoundedCorners implements Parcelable {
             radius = array.getDimensionPixelSize(index, 0);
         } else {
             radius = res.getDimensionPixelSize(R.dimen.rounded_corner_radius_bottom);
+        }
+        int syspropRadius = SystemProperties.getInt("persist.sys.phh.rounded_corners_padding", -1);
+        if (syspropRadius >= 0) {
+            radius = syspropRadius;
         }
         array.recycle();
         return radius;
