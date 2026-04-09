@@ -36,6 +36,9 @@
 #include <hardware_legacy/power.h>
 #include <hidl/ServiceManagement.h>
 #include <limits.h>
+#include <android-base/properties.h>
+#include <sstream>
+#include <unordered_set>
 #include <nativehelper/JNIHelp.h>
 #include <nativehelper/ScopedUtfChars.h>
 #include <powermanager/PowerHalController.h>
@@ -84,12 +87,48 @@ static void setPowerBoost(Boost boost, int32_t durationMs) {
     SurfaceComposerClient::notifyPowerBoost(static_cast<int32_t>(boost));
 }
 
+static const std::unordered_set<int>& getBlockedPowerModes() {
+    // re-read property when it changes. the property is populated
+    // incrementally by power-mode-monitor.sh after boot -- new mode IDs
+    // may be appended over the first ~90 seconds.
+    static std::unordered_set<int> sModes;
+    static std::string sLastVal;
+    std::string val = android::base::GetProperty("persist.sys.phh.blocked_power_modes", "");
+    if (val == sLastVal) return sModes;
+    sLastVal = val;
+    sModes.clear();
+    std::istringstream ss(val);
+    std::string token;
+    while (std::getline(ss, token, ',')) {
+        if (!token.empty()) {
+            sModes.insert(std::stoi(token));
+        }
+    }
+    if (!sModes.empty()) {
+        ALOGI("blocked power modes from property: %s", val.c_str());
+    }
+    return sModes;
+}
+
 static bool setPowerMode(Mode mode, bool enabled) {
+    // skip modes that the vendor HAL doesn't support.
+    // two-layer cache: persist property (for buggy AIDL HALs that lie about
+    // isModeSupported), and runtime detection via isUnsupported().
+    static std::unordered_set<Mode> sUnsupportedModes;
+    int modeInt = static_cast<int>(mode);
+    if (getBlockedPowerModes().count(modeInt) || sUnsupportedModes.count(mode)) {
+        return true;
+    }
     android::base::Timer t;
     auto result = gPowerHalController.setMode(mode, enabled);
     if (mode == Mode::INTERACTIVE && t.duration() > 20ms) {
         ALOGD("Excessive delay in setting interactive mode to %s while turning screen %s",
               enabled ? "true" : "false", enabled ? "on" : "off");
+    }
+    if (result.isUnsupported()) {
+        ALOGI("power mode %d not supported by HAL, suppressing future calls", modeInt);
+        sUnsupportedModes.insert(mode);
+        return true;
     }
     return result.isOk();
 }
