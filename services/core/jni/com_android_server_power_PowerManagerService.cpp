@@ -38,6 +38,7 @@
 #include <limits.h>
 #include <android-base/properties.h>
 #include <sstream>
+#include <unordered_map>
 #include <unordered_set>
 #include <nativehelper/JNIHelp.h>
 #include <nativehelper/ScopedUtfChars.h>
@@ -119,6 +120,15 @@ static bool setPowerMode(Mode mode, bool enabled) {
     if (getBlockedPowerModes().count(modeInt) || sUnsupportedModes.count(mode)) {
         return true;
     }
+    // deduplicate redundant state transitions.
+    // some vendor HALs (notably MTK) burn cpu on every setMode call even when
+    // the state hasn't changed. avoid the binder IPC entirely when the
+    // requested state matches our last cached value.
+    static std::unordered_map<Mode, bool> sLastState;
+    auto it = sLastState.find(mode);
+    if (it != sLastState.end() && it->second == enabled) {
+        return true;
+    }
     android::base::Timer t;
     auto result = gPowerHalController.setMode(mode, enabled);
     if (mode == Mode::INTERACTIVE && t.duration() > 20ms) {
@@ -129,6 +139,9 @@ static bool setPowerMode(Mode mode, bool enabled) {
         ALOGI("power mode %d not supported by HAL, suppressing future calls", modeInt);
         sUnsupportedModes.insert(mode);
         return true;
+    }
+    if (result.isOk()) {
+        sLastState[mode] = enabled;
     }
     return result.isOk();
 }
