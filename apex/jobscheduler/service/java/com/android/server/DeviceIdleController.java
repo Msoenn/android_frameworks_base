@@ -69,6 +69,7 @@ import android.os.Message;
 import android.os.PowerExemptionManager;
 import android.os.PowerExemptionManager.ReasonCode;
 import android.os.PowerExemptionManager.TempAllowListType;
+import android.os.SystemProperties;
 import android.os.PowerManager;
 import android.os.PowerManager.ServiceType;
 import android.os.PowerManagerInternal;
@@ -2592,6 +2593,15 @@ public class DeviceIdleController extends SystemService
         }
 
         boolean useMotionSensor() {
+            // MTK vendor HALs on A16 kernels continuously fire motion events,
+            // preventing doze and burning battery. Auto-disable AnyMotionDetector
+            // for MTK devices (issue #21).
+            String hardware = SystemProperties.get("ro.hardware", "");
+            String board = SystemProperties.get("ro.board.platform", "");
+            if (hardware.startsWith("mt") || board.startsWith("mt")
+                    || hardware.contains("mtk") || board.contains("mtk")) {
+                return false;
+            }
             return mContext.getResources().getBoolean(
                    com.android.internal.R.bool.config_autoPowerModeUseMotionSensor);
         }
