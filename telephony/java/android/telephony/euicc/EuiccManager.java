@@ -36,6 +36,7 @@ import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.RemoteException;
+import android.os.SystemProperties;
 import android.telephony.SubscriptionInfo;
 import android.telephony.SubscriptionManager;
 import android.telephony.TelephonyFrameworkInitializer;
@@ -950,6 +951,12 @@ public class EuiccManager {
     public boolean isEnabled() {
         // In the future, this may reach out to IEuiccController (if non-null) to check any dynamic
         // restrictions.
+        // on devices with forced eUICC slot detection (e.g. MediaTek DL2005/HCT eSIM that
+        // does not report EID through standard AOSP paths), skip the cardId check since
+        // the EID-based cardId will never initialise.
+        if (!SystemProperties.get("persist.sys.phh.force_euicc_slots", "").isEmpty()) {
+            return getIEuiccController() != null;
+        }
         return getIEuiccController() != null && refreshCardIdIfUninitialized();
     }
 
