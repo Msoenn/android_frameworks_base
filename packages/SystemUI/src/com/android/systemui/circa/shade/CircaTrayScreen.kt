@@ -105,8 +105,12 @@ private val TILE_SIZE = 52.dp
 private val TILE_GAP = 5.dp
 private val TILE_ICON = 26.dp
 
-/** The panel is taller than the screen; Wear centres the grid, so the content moves down by half. */
-private val QS_SHIFT = 18.dp
+/**
+ * Vertical offset of the panel content. The prototype's +18 dp was measured inside Wear's
+ * TransformingLazyColumn, which centres the (screen + 48 dp) panel, i.e. starts it 24 dp above the
+ * screen top; this plain column starts it at the top, so the same picture needs 18 - 24 dp.
+ */
+private val QS_SHIFT = (-6).dp
 private val QS_EXTRA_HEIGHT = 48.dp
 
 /** Top of the 3 + 3 grid; the phone pill sits right under it, inside the circle's bottom chord. */
@@ -209,11 +213,14 @@ internal fun CircaTrayScreen(
                 ): Offset {
                     if (source != NestedScrollSource.UserInput) return Offset.Zero
                     pulled = if (available.y > 0f) pulled + available.y else 0f
+                    if (pulled > pullDismissPx) {
+                        pulled = 0f
+                        close()
+                    }
                     return Offset.Zero
                 }
 
                 override suspend fun onPreFling(available: Velocity): Velocity {
-                    if (pulled > pullDismissPx) close()
                     pulled = 0f
                     return Velocity.Zero
                 }
