@@ -78,6 +78,9 @@ class CircaEdgeSwipe(
             }
     }
 
+    /** For dumpsys; also reads [monitor] and [receiver], so R8 keeps them alive. */
+    fun describe(): String = "monitor=${monitor != null} receiver=${receiver != null}"
+
     fun stop() {
         receiver?.dispose()
         receiver = null

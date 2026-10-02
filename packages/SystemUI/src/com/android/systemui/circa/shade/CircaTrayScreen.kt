@@ -51,6 +51,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
@@ -83,6 +84,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.Velocity
@@ -122,6 +124,24 @@ private const val SETTLE_MILLIS = 180
 
 /** Pulling down this far past the quick-settings top dismisses the tray (stock behaviour). */
 private val PULL_DISMISS = 56.dp
+
+/**
+ * The tray is laid out for a 200 dp wide screen whatever the system density is (the watch runs
+ * `wm density 192`, i.e. 320 dp across, for phone apps), so its geometry matches stock Wear and the
+ * launcher prototype, which uses the same rule (apps/launcher model/Density.kt).
+ */
+private const val TARGET_WIDTH_DP = 200f
+
+@Composable
+internal fun CircaTrayDensity(content: @Composable () -> Unit) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val base = LocalDensity.current
+        val widthPx = constraints.maxWidth.toFloat()
+        val density =
+            if (widthPx > 0f) Density(widthPx / TARGET_WIDTH_DP, base.fontScale) else base
+        CompositionLocalProvider(LocalDensity provides density) { content() }
+    }
+}
 
 /** The stock Wear dark palette (Wear Material 3 defaults), with the configurable accent. */
 internal class CircaColors(val accent: Color) {
@@ -519,7 +539,9 @@ private fun RoundButton(
 /** Battery: the level as text under the icon; tap toggles battery saver (accent while on). */
 @Composable
 private fun BatteryButton(qs: CircaQuickSettings, colors: CircaColors, onClose: () -> Unit) {
-    val saver = qs.batterySaver.state.value
+    val saverState = qs.batterySaver.state.value
+    // Battery saver is unavailable while charging; the tile still shows the level normally.
+    val saver = if (saverState == CircaToggle.UNAVAILABLE) CircaToggle.OFF else saverState
     val level = qs.batteryLevel.intValue
     val tint = saver.tint(colors)
     RoundButton(
@@ -528,8 +550,7 @@ private fun BatteryButton(qs: CircaQuickSettings, colors: CircaColors, onClose: 
         stateDescription = if (level >= 0) "battery $level percent" else null,
         background = saver.background(colors),
         tint = tint,
-        enabled = qs.batterySaver.tile != null,
-        onClick = { qs.batterySaver.toggle() },
+        onClick = { if (saverState != CircaToggle.UNAVAILABLE) qs.batterySaver.toggle() },
         onLongClick = {
             qs.openBatterySettings()
             onClose()

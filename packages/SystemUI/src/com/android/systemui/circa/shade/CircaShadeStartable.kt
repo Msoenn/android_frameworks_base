@@ -146,7 +146,12 @@ constructor(
     }
 
     override fun dump(pw: PrintWriter, args: Array<out String>) {
-        pw.println("CircaShadeStartable: enabled=$enabled trayOpen=${tray.isOpen}")
+        // Reading edgeSwipe here also keeps R8 from dropping the field as write-only, which let the
+        // gesture monitor be garbage collected (its input channel closed a second after boot).
+        pw.println(
+            "CircaShadeStartable: enabled=$enabled trayOpen=${tray.isOpen} " +
+                "edgeSwipe=${edgeSwipe?.describe()}"
+        )
     }
 
     companion object {
