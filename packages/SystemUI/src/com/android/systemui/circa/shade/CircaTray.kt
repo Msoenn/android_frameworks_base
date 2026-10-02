@@ -40,7 +40,8 @@ import com.android.systemui.res.R
 import javax.inject.Inject
 
 /**
- * The Wear tray: one full-screen window above the keyguard and the (disabled) phone shade, holding
+ * The Wear tray: one full-screen window (TYPE_NAVIGATION_BAR_PANEL: above the keyguard, the
+ * (disabled) phone shade and the navigation bar), holding
  * a Compose column with quick settings at the top and the notification stream below them
  * (research/wear-reference-tour.md §5). [open] shows it scrolled to either end; [close] hides it.
  *
@@ -116,7 +117,7 @@ constructor(
             WindowManager.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT,
-                    WindowManager.LayoutParams.TYPE_STATUS_BAR_SUB_PANEL,
+                    WindowManager.LayoutParams.TYPE_NAVIGATION_BAR_PANEL,
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
                         WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
                     PixelFormat.TRANSLUCENT,
@@ -141,12 +142,14 @@ constructor(
                         val current by session
                         current?.let { s ->
                             key(s.id) {
-                                CircaTrayScreen(
-                                    session = s,
-                                    quickSettings = quickSettings,
-                                    notifications = notifications,
-                                    onClose = ::close,
-                                )
+                                CircaTrayDensity {
+                                    CircaTrayScreen(
+                                        session = s,
+                                        quickSettings = quickSettings,
+                                        notifications = notifications,
+                                        onClose = ::close,
+                                    )
+                                }
                             }
                         }
                     }
