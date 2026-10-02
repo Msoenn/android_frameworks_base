@@ -45,6 +45,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import com.android.systemui.plugins.qs.QSTile
+import com.android.systemui.res.R
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -180,7 +187,7 @@ internal fun CircaTrayScreen(
     BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black)) {
         val screenHeight = maxHeight
         val screenWidthPx = with(density) { maxWidth.toPx() }
-        val panelHeight = screenHeight + QS_EXTRA_HEIGHT
+        val panelHeight = quickSettingsHeight(quickSettings.tiles.value.size, screenHeight)
         val startOffset =
             if (session.end == CircaTray.End.NOTIFICATIONS) {
                 with(density) { (panelHeight - STREAM_TOP).roundToPx() }
@@ -193,6 +200,8 @@ internal fun CircaTrayScreen(
                 initialFirstVisibleItemScrollOffset = startOffset,
             )
         val focusRequester = remember { FocusRequester() }
+        var editing by remember { mutableStateOf(false) }
+        LaunchedEffect(editing) { if (!editing) focusRequester.requestFocus() }
         val dragOffset = remember { Animatable(0f) }
         val enter =
             remember { Animatable(if (session.end == CircaTray.End.QUICK_SETTINGS) -1f else 1f) }
@@ -274,7 +283,13 @@ internal fun CircaTrayScreen(
                 modifier = Modifier.fillMaxSize().nestedScroll(pullToDismiss),
             ) {
                 item(key = "quick_settings") {
-                    QuickSettingsPanel(quickSettings, colors, panelHeight, onClose = close)
+                    QuickSettingsPanel(
+                        quickSettings,
+                        colors,
+                        panelHeight,
+                        onClose = close,
+                        onEdit = { editing = true },
+                    )
                 }
                 if (items.isEmpty()) {
                     item(key = "stream_empty") {
@@ -316,6 +331,9 @@ internal fun CircaTrayScreen(
                 }
             }
             ScrollIndicator(listState, colors, Modifier.fillMaxSize())
+        }
+        if (editing) {
+            EditTilesScreen(quickSettings, colors, screenHeight, onDone = { editing = false })
         }
     }
 }
@@ -389,12 +407,22 @@ private fun ScrollIndicator(state: LazyListState, colors: CircaColors, modifier:
 
 // ---- quick settings -----------------------------------------------------------------------------
 
+/** Height of the quick-settings item for [tileCount] tiles: the grid, the phone pill, Edit. */
+internal fun quickSettingsHeight(tileCount: Int, screenHeight: Dp): Dp {
+    val rows = (tileCount + 2) / 3
+    val grid = if (rows == 0) 0.dp else TILE_SIZE * rows + TILE_GAP * (rows - 1)
+    val content = GRID_TOP + grid + PILL_GAP + PILL_HEIGHT + TILE_GAP + PILL_HEIGHT + QS_BOTTOM_SPACE
+    return maxOf(screenHeight + QS_EXTRA_HEIGHT, content)
+}
+
+private val PILL_HEIGHT = 24.dp
+private val PILL_GAP = 4.dp
+private val QS_BOTTOM_SPACE = 24.dp
+
 /**
- * Stock's quick-settings grid, fixed (decisions.md "Quick settings A"): a status row on top
- * (airplane, location, auto brightness; tappable), then 3 + 3 round buttons that all sit inside
- * the circle - DND, Bluetooth, Wi-Fi; battery (% inside, tap = battery saver), brightness (a
- * level ring, tap = next step), Settings - and the phone-connection pill.
- * Long press on a toggle opens its settings page.
+ * Stock's quick-settings grid (decisions.md "Quick settings A"), driven by the user's real tile
+ * list: round buttons, three per row, in the order of `sysui_qs_tiles`; then the phone pill and
+ * the Edit pill. Tap toggles, long press opens the tile's settings page.
  */
 @Composable
 private fun QuickSettingsPanel(
@@ -402,63 +430,36 @@ private fun QuickSettingsPanel(
     colors: CircaColors,
     height: Dp,
     onClose: () -> Unit,
+    onEdit: () -> Unit,
 ) {
+    val tiles = qs.tiles.value
     Box(Modifier.fillMaxWidth().height(height)) {
-        Row(
-            modifier = Modifier.align(Alignment.TopCenter).padding(top = 22.dp + QS_SHIFT),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            StatusPip(CircaSymbols.Airplane, "Airplane mode", qs.airplane.state.value, colors) {
-                qs.airplane.toggle()
-            }
-            StatusPip(CircaSymbols.Location, "Location", qs.location.state.value, colors) {
-                qs.location.toggle()
-            }
-            StatusPip(
-                CircaSymbols.BrightnessAuto,
-                "Auto brightness",
-                if (qs.autoBrightness.value) CircaToggle.ON else CircaToggle.OFF,
-                colors,
-            ) {
-                qs.toggleAutoBrightness()
-            }
-        }
         Column(
             modifier = Modifier.align(Alignment.TopCenter).padding(top = GRID_TOP),
             verticalArrangement = Arrangement.spacedBy(TILE_GAP),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(TILE_GAP)) {
-                TileButton(qs.dnd, CircaSymbols.DoNotDisturb, "Do Not Disturb", colors, onClose)
-                TileButton(qs.bluetooth, CircaSymbols.Bluetooth, "Bluetooth", colors, onClose)
-                TileButton(qs.wifi, CircaSymbols.Wifi, "Wi-Fi", colors, onClose)
+            for (row in tiles.chunked(3)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(TILE_GAP)) {
+                    for (tile in row) TileButton(tile, qs, colors, onClose)
+                }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(TILE_GAP)) {
-                BatteryButton(qs, colors, onClose)
-                BrightnessButton(qs, colors, onClose)
-                RoundButton(
-                    icon = CircaSymbols.Settings,
-                    label = "Settings",
-                    background = colors.surface,
-                    tint = colors.onSurface,
-                    onClick = {
-                        qs.openSettings()
-                        onClose()
-                    },
-                )
-            }
+            Spacer(Modifier.height(PILL_GAP - TILE_GAP))
+            PhonePill(
+                connected = qs.phoneConnected.value,
+                colors = colors,
+                onClick = {
+                    qs.openBluetoothSettings()
+                    onClose()
+                },
+            )
+            SmallPill(
+                icon = CircaSymbols.Edit,
+                text = stringResource(R.string.circa_edit_tiles),
+                colors = colors,
+                onClick = onEdit,
+            )
         }
-        PhonePill(
-            connected = qs.phoneConnected.value,
-            colors = colors,
-            modifier =
-                Modifier.align(Alignment.TopCenter)
-                    .padding(top = GRID_TOP + TILE_SIZE * 2 + TILE_GAP + 4.dp),
-            onClick = {
-                qs.openBluetoothSettings()
-                onClose()
-            },
-        )
     }
 }
 
@@ -476,41 +477,105 @@ private fun CircaToggle.tint(c: CircaColors): Color =
         CircaToggle.UNAVAILABLE -> c.outlineVariant
     }
 
+/** Material Symbols for the tiles we know; other tiles draw their own icon. */
+private fun symbolFor(spec: String): ImageVector? =
+    when (spec) {
+        "dnd",
+        "modes_dnd" -> CircaSymbols.DoNotDisturb
+        "theater" -> CircaSymbols.Theaters
+        "bt" -> CircaSymbols.Bluetooth
+        "wifi",
+        "internet" -> CircaSymbols.Wifi
+        "battery" -> CircaSymbols.BatterySaver
+        "circa_brightness" -> CircaSymbols.Brightness
+        "circa_settings" -> CircaSymbols.Settings
+        "airplane" -> CircaSymbols.Airplane
+        "location" -> CircaSymbols.Location
+        "flashlight" -> CircaSymbols.FlashlightOn
+        "rotation" -> CircaSymbols.ScreenRotation
+        "hotspot" -> CircaSymbols.WifiTethering
+        "saver" -> CircaSymbols.DataSaverOn
+        "dark" -> CircaSymbols.DarkMode
+        "screenrecord" -> CircaSymbols.ScreenRecord
+        "cast" -> CircaSymbols.Cast
+        "nfc" -> CircaSymbols.Nfc
+        "night" -> CircaSymbols.Nightlight
+        "inversion" -> CircaSymbols.InvertColors
+        "qr_code_scanner" -> CircaSymbols.QrCodeScanner
+        "mictoggle" -> CircaSymbols.Mic
+        "cameratoggle" -> CircaSymbols.CameraVideo
+        "hearing_devices" -> CircaSymbols.Hearing
+        "alarm" -> CircaSymbols.Alarm
+        "caffeine" -> CircaSymbols.Coffee
+        "vpn" -> CircaSymbols.VpnKey
+        "cell" -> CircaSymbols.SignalCellularAlt
+        else -> null
+    }
+
+/** A tile's icon: the Material Symbol when we have one, else the tile's own drawable, tinted. */
 @Composable
-private fun TileButton(
-    tile: CircaTile,
-    icon: ImageVector,
-    label: String,
-    colors: CircaColors,
-    onClose: () -> Unit,
+private fun TileIcon(
+    spec: String,
+    tileIcon: QSTile.Icon?,
+    fallback: Drawable?,
+    tint: Color,
+    size: Dp,
 ) {
-    val state = tile.state.value
-    RoundButton(
-        icon = icon,
-        label = label,
-        stateDescription = state.name.lowercase(),
-        background = state.background(colors),
-        tint = state.tint(colors),
-        enabled = tile.tile != null,
-        onClick = { tile.toggle() },
-        onLongClick = {
-            tile.openSettings()
-            onClose()
-        },
-    )
+    val symbol = symbolFor(spec)
+    if (symbol != null) {
+        Icon(imageVector = symbol, contentDescription = null, tint = tint, modifier = Modifier.size(size))
+        return
+    }
+    val context = LocalContext.current
+    val bitmap =
+        remember(tileIcon, fallback) {
+            val d = fallback ?: runCatching { tileIcon?.getDrawable(context) }.getOrNull()
+            d?.let { runCatching { it.toBitmap(64, 64).asImageBitmap() }.getOrNull() }
+        }
+    if (bitmap != null) {
+        Image(
+            bitmap = bitmap,
+            contentDescription = null,
+            colorFilter = ColorFilter.tint(tint),
+            modifier = Modifier.size(size),
+        )
+    } else {
+        Box(Modifier.size(size))
+    }
+}
+
+@Composable
+private fun TileButton(tile: CircaTile, qs: CircaQuickSettings, colors: CircaColors, onClose: () -> Unit) {
+    when (tile.spec) {
+        "battery" -> BatteryButton(tile, qs, colors, onClose)
+        "circa_brightness" -> BrightnessButton(tile, colors, onClose)
+        else -> {
+            val state = tile.state.value
+            RoundButton(
+                label = tile.label.value.toString(),
+                stateDescription = state.name.lowercase(),
+                background = state.background(colors),
+                onClick = { tile.toggle() },
+                onLongClick = {
+                    tile.longPress()
+                    onClose()
+                },
+            ) {
+                TileIcon(tile.spec, tile.icon.value, null, state.tint(colors), TILE_ICON)
+            }
+        }
+    }
 }
 
 @Composable
 private fun RoundButton(
-    icon: ImageVector,
     label: String,
     background: Color,
-    tint: Color,
     stateDescription: String? = null,
     enabled: Boolean = true,
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
-    content: (@Composable () -> Unit)? = null,
+    content: @Composable () -> Unit,
 ) {
     Box(
         modifier =
@@ -530,36 +595,30 @@ private fun RoundButton(
                 },
         contentAlignment = Alignment.Center,
     ) {
-        if (content != null) {
-            content()
-        } else {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = tint,
-                modifier = Modifier.size(TILE_ICON),
-            )
-        }
+        content()
     }
 }
 
-/** Battery: the level as text under the icon; tap toggles battery saver (accent while on). */
+/** Battery: the level under the icon; tap toggles battery saver (accent while on). */
 @Composable
-private fun BatteryButton(qs: CircaQuickSettings, colors: CircaColors, onClose: () -> Unit) {
-    val saverState = qs.batterySaver.state.value
+private fun BatteryButton(
+    tile: CircaTile,
+    qs: CircaQuickSettings,
+    colors: CircaColors,
+    onClose: () -> Unit,
+) {
+    val saverState = tile.state.value
     // Battery saver is unavailable while charging; the tile still shows the level normally.
     val saver = if (saverState == CircaToggle.UNAVAILABLE) CircaToggle.OFF else saverState
     val level = qs.batteryLevel.intValue
     val tint = saver.tint(colors)
     RoundButton(
-        icon = CircaSymbols.Battery,
-        label = "Battery saver",
+        label = tile.label.value.toString(),
         stateDescription = if (level >= 0) "battery $level percent" else null,
         background = saver.background(colors),
-        tint = tint,
-        onClick = { if (saverState != CircaToggle.UNAVAILABLE) qs.batterySaver.toggle() },
+        onClick = { if (saverState != CircaToggle.UNAVAILABLE) tile.toggle() },
         onLongClick = {
-            qs.openBatterySettings()
+            tile.longPress()
             onClose()
         },
     ) {
@@ -582,20 +641,22 @@ private fun BatteryButton(qs: CircaQuickSettings, colors: CircaColors, onClose: 
     }
 }
 
-/** Brightness is a level, not a switch: a ring shows the level, a tap steps to the next one. */
+/**
+ * Brightness is a level, not a switch: a ring shows the level (from the tile's "NN%" secondary
+ * label), a tap steps to the next level.
+ */
 @Composable
-private fun BrightnessButton(qs: CircaQuickSettings, colors: CircaColors, onClose: () -> Unit) {
-    val auto = qs.autoBrightness.value
-    val fraction = qs.brightness.intValue / CircaQuickSettings.BRIGHTNESS_MAX.toFloat()
+private fun BrightnessButton(tile: CircaTile, colors: CircaColors, onClose: () -> Unit) {
+    val secondary = tile.secondaryLabel.value?.toString()
+    val percent = secondary?.removeSuffix("%")?.toIntOrNull()
+    val auto = secondary != null && percent == null
     RoundButton(
-        icon = CircaSymbols.Brightness,
-        label = "Brightness",
-        stateDescription = if (auto) "automatic" else "${(fraction * 100).roundToInt()} percent",
+        label = tile.label.value.toString(),
+        stateDescription = secondary,
         background = colors.surface,
-        tint = colors.onSurface,
-        onClick = { qs.cycleBrightness() },
+        onClick = { tile.toggle() },
         onLongClick = {
-            qs.openDisplaySettings()
+            tile.longPress()
             onClose()
         },
     ) {
@@ -612,11 +673,11 @@ private fun BrightnessButton(qs: CircaQuickSettings, colors: CircaColors, onClos
                 size = arcSize,
                 style = Stroke(w),
             )
-            if (!auto && fraction > 0f) {
+            if (percent != null && percent > 0) {
                 drawArc(
                     color = colors.accent,
                     startAngle = -90f,
-                    sweepAngle = 360f * fraction.coerceIn(0f, 1f),
+                    sweepAngle = 3.6f * percent.coerceIn(0, 100),
                     useCenter = false,
                     topLeft = topLeft,
                     size = arcSize,
@@ -633,77 +694,216 @@ private fun BrightnessButton(qs: CircaQuickSettings, colors: CircaColors, onClos
     }
 }
 
-/** A small status pill of the top row: lit in the accent while on; a tap toggles it. */
+/** Stock's pill under the grid: the phone connection, read-only; a tap opens Bluetooth settings. */
 @Composable
-private fun StatusPip(
+private fun PhonePill(connected: Boolean, colors: CircaColors, onClick: () -> Unit) {
+    SmallPill(
+        icon = if (connected) CircaSymbols.SmartphoneOutlined else CircaSymbols.SmartphoneOffOutlined,
+        text = if (connected) "Connected" else "Disconnected",
+        colors = colors,
+        dim = !connected,
+        description = if (connected) "Phone connected" else "Phone disconnected",
+        onClick = onClick,
+    )
+}
+
+@Composable
+private fun SmallPill(
     icon: ImageVector,
-    label: String,
-    state: CircaToggle,
+    text: String,
     colors: CircaColors,
+    dim: Boolean = false,
+    description: String = text,
     onClick: () -> Unit,
 ) {
-    val on = state == CircaToggle.ON
+    val tint = if (dim) colors.outline else colors.onSurface
+    Row(
+        modifier =
+            Modifier.height(PILL_HEIGHT)
+                .clip(CircleShape)
+                .background(colors.surface)
+                .combinedClickable(role = Role.Button, onClick = onClick)
+                .padding(horizontal = 9.dp)
+                .semantics { contentDescription = description },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        Icon(imageVector = icon, contentDescription = null, tint = tint, modifier = Modifier.size(15.dp))
+        Text(text = text, color = tint, fontSize = 10.sp, maxLines = 1)
+    }
+}
+
+// ---- edit mode ----------------------------------------------------------------------------------
+
+/**
+ * Round edit mode for the tile list: the current tiles in order, each with move-up / move-down /
+ * remove, then every tile that can be added with "+". Changes go straight to SystemUI's tile list
+ * (CurrentTilesInteractor -> `sysui_qs_tiles`), so they persist and the grid follows.
+ */
+@Composable
+private fun EditTilesScreen(
+    qs: CircaQuickSettings,
+    colors: CircaColors,
+    screenHeight: Dp,
+    onDone: () -> Unit,
+) {
+    val tiles = qs.tiles.value
+    val specs = tiles.map { it.spec }
+    var available by remember { mutableStateOf<List<CircaAvailableTile>?>(null) }
+    LaunchedEffect(specs) { qs.loadAvailableTiles { available = it } }
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+    LazyColumn(
+        state = listState,
+        contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 30.dp, bottom = 70.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+        modifier =
+            Modifier.fillMaxSize()
+                .background(Color.Black)
+                .onRotaryScrollEvent { e ->
+                    scope.launch { listState.scrollBy(e.verticalScrollPixels) }
+                    true
+                }
+                .focusRequester(focusRequester)
+                .focusable(),
+    ) {
+        item(key = "title") {
+            Text(
+                text = stringResource(R.string.circa_edit_tiles),
+                color = colors.onSurface,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.padding(bottom = 4.dp),
+            )
+        }
+        itemsIndexed(tiles, key = { _, t -> "cur:" + t.spec }) { index, t ->
+            EditRow(
+                spec = t.spec,
+                label = t.label.value.toString(),
+                tileIcon = t.icon.value,
+                icon = null,
+                colors = colors,
+                modifier = Modifier.edgeTransform(listState, "cur:" + t.spec, screenHeight),
+            ) {
+                if (index > 0) {
+                    EditAction(CircaSymbols.ArrowUpward, "Move up", colors) { qs.moveTile(index, -1) }
+                }
+                if (index < tiles.size - 1) {
+                    EditAction(CircaSymbols.ArrowDownward, "Move down", colors) {
+                        qs.moveTile(index, 1)
+                    }
+                }
+                EditAction(CircaSymbols.Remove, "Remove", colors) { qs.removeTile(t.spec) }
+            }
+        }
+        item(key = "add_header") {
+            Text(
+                text = stringResource(R.string.circa_add_tiles),
+                color = colors.onSurfaceVariant,
+                fontSize = 13.sp,
+                modifier = Modifier.padding(top = 10.dp, bottom = 2.dp),
+            )
+        }
+        items(available ?: emptyList(), key = { "add:" + it.spec }) { a ->
+            EditRow(
+                spec = a.spec,
+                label = a.label.toString(),
+                tileIcon = null,
+                icon = a.icon,
+                colors = colors,
+                modifier = Modifier.edgeTransform(listState, "add:" + a.spec, screenHeight),
+            ) {
+                EditAction(CircaSymbols.Add, "Add", colors, accent = true) { qs.addTile(a.spec) }
+            }
+        }
+        item(key = "done") {
+            Row(
+                modifier =
+                    Modifier.padding(top = 10.dp)
+                        .height(36.dp)
+                        .clip(CircleShape)
+                        .background(colors.accent)
+                        .combinedClickable(role = Role.Button, onClick = onDone)
+                        .padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Icon(
+                    imageVector = CircaSymbols.Check,
+                    contentDescription = null,
+                    tint = colors.onAccent,
+                    modifier = Modifier.size(18.dp),
+                )
+                Text(
+                    text = stringResource(R.string.circa_edit_done),
+                    color = colors.onAccent,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun EditRow(
+    spec: String,
+    label: String,
+    tileIcon: QSTile.Icon?,
+    icon: Drawable?,
+    colors: CircaColors,
+    modifier: Modifier,
+    actions: @Composable () -> Unit,
+) {
+    Row(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .height(44.dp)
+                .clip(CircleShape)
+                .background(colors.surface)
+                .padding(start = 12.dp, end = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        TileIcon(spec, tileIcon, icon, colors.onSurface, 18.dp)
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = label,
+            color = colors.onSurface,
+            fontSize = 13.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) { actions() }
+    }
+}
+
+@Composable
+private fun EditAction(
+    icon: ImageVector,
+    label: String,
+    colors: CircaColors,
+    accent: Boolean = false,
+    onClick: () -> Unit,
+) {
     Box(
         modifier =
-            Modifier.size(width = 30.dp, height = 20.dp)
+            Modifier.size(30.dp)
                 .clip(CircleShape)
-                .background(if (on) colors.accentContainer else colors.surfaceLow)
-                .combinedClickable(
-                    enabled = state != CircaToggle.UNAVAILABLE,
-                    role = Role.Button,
-                    onClick = onClick,
-                )
-                .semantics { contentDescription = if (on) "$label on" else "$label off" },
+                .background(if (accent) colors.accent else colors.surfaceHigh)
+                .combinedClickable(role = Role.Button, onClickLabel = label, onClick = onClick)
+                .semantics { contentDescription = label },
         contentAlignment = Alignment.Center,
     ) {
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = if (on) colors.accent else colors.outline,
-            modifier = Modifier.size(13.dp),
-        )
-    }
-}
-
-/** Stock's pill under the grid: the phone connection, read-only; a tap opens Bluetooth settings. */
-@Composable
-private fun PhonePill(
-    connected: Boolean,
-    colors: CircaColors,
-    modifier: Modifier,
-    onClick: () -> Unit,
-) {
-    val tint = if (connected) colors.onSurface else colors.outline
-    Row(
-        modifier =
-            modifier
-                .height(24.dp)
-                .clip(CircleShape)
-                .background(colors.surface)
-                .combinedClickable(role = Role.Button, onClick = onClick)
-                .padding(horizontal = 9.dp)
-                .semantics {
-                    contentDescription = if (connected) "Phone connected" else "Phone disconnected"
-                },
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(5.dp),
-    ) {
-        Icon(
-            imageVector =
-                if (connected) {
-                    CircaSymbols.SmartphoneOutlined
-                } else {
-                    CircaSymbols.SmartphoneOffOutlined
-                },
-            contentDescription = null,
-            tint = tint,
-            modifier = Modifier.size(15.dp),
-        )
-        Text(
-            text = if (connected) "Connected" else "Disconnected",
-            color = tint,
-            fontSize = 10.sp,
-            maxLines = 1,
+            tint = if (accent) colors.onAccent else colors.onSurface,
+            modifier = Modifier.size(18.dp),
         )
     }
 }

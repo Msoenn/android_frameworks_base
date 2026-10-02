@@ -29,4 +29,15 @@
          tray at its quick-settings / notifications end. -->
     <dimen name="circa_shade_edge_top">36dp</dimen>
     <dimen name="circa_shade_edge_bottom">36dp</dimen>
+
+    <!-- Circa: the quick-settings tiles the Circa shade starts with (written to sysui_qs_tiles
+         once, the first time the shade runs; edit mode changes them afterwards). -->
+    <string name="circa_qs_tiles_default" translatable="false">modes_dnd,theater,bt,wifi,battery,circa_brightness,circa_settings</string>
+
+    <string name="circa_theater_mode">Theater mode</string>
+    <string name="circa_brightness">Brightness</string>
+    <string name="circa_settings">Settings</string>
+    <string name="circa_edit_tiles">Edit</string>
+    <string name="circa_edit_done">Done</string>
+    <string name="circa_add_tiles">Add tiles</string>
 </resources>

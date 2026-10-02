@@ -65,6 +65,7 @@ constructor(
     private val broadcastDispatcher: BroadcastDispatcher,
     @Main private val mainExecutor: Executor,
     private val tray: CircaTray,
+    private val theaterMode: CircaTheaterMode,
 ) : CoreStartable {
 
     private val disableToken = Binder()
@@ -119,6 +120,7 @@ constructor(
         Log.i(TAG, "Circa Wear shade enabled")
 
         tray.init()
+        theaterMode.start()
         try {
             barService.disable(StatusBarManager.DISABLE_EXPAND, disableToken, context.packageName)
         } catch (e: RemoteException) {
