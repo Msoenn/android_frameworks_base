@@ -1248,6 +1248,7 @@
          a watch, setting this config is no-op.
             0 - Nothing
             1 - Launch voice assistant
+            2 - Circa: show the global actions (power) menu
     -->
     <integer name="config_longPressOnStemPrimaryBehavior">0</integer>
 
@@ -1274,8 +1275,15 @@
            0 - Nothing
            1 - Go to launch all apps
            2 - Launch target activity defined by config_primaryShortPressTargetActivity if available
+           3 - Circa: open the home app's app list when home is on top, otherwise go home
     -->
     <integer name="config_shortPressOnStemPrimaryBehavior">0</integer>
+
+    <!-- Circa: when true, a short press of the power button while the screen is on and the
+         keyguard is not showing opens the home app's Recents page (action
+         org.circa.intent.action.SHOW_RECENTS) instead of the config_shortPressOnPowerBehavior
+         action. A press while the screen is off still wakes the device. -->
+    <bool name="config_circaPowerShortPressOpensRecents">false</bool>
 
    <!-- Activity name for the default target activity to be launched. [DO NOT TRANSLATE] -->
    <string name="config_primaryShortPressTargetActivity" translatable="false"></string>

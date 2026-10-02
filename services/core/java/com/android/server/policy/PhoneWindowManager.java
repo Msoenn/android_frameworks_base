@@ -137,6 +137,7 @@ import android.app.PendingIntent;
 import android.app.ProgressDialog;
 import android.app.SearchManager;
 import android.app.UiModeManager;
+import android.app.WindowConfiguration;
 import android.bluetooth.BluetoothProfile;
 import android.content.ActivityNotFoundException;
 import android.content.BroadcastReceiver;
@@ -618,6 +619,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     int mLidKeyboardAccessibility;
     int mLidNavigationAccessibility;
     int mShortPressOnPowerBehavior;
+    // Circa: config_circaPowerShortPressOpensRecents
+    boolean mCircaPowerShortPressOpensRecents;
     private boolean mShouldEarlyShortPressOnPower;
     boolean mShouldEarlyShortPressOnStemPrimary;
     int mLongPressOnPowerBehavior;
@@ -1309,6 +1312,11 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         } else if (count > 3 && count <= getMaxMultiPressPowerCount()) {
             Slog.d(TAG, "No behavior defined for power press count " + count);
         } else if (count == 1 && shouldHandleShortPressPowerAction(interactive, eventTime)) {
+            if (CircaKeyPolicy.powerShortPressOpensRecents(mCircaPowerShortPressOpensRecents,
+                    interactive, keyguardOn())) {
+                circaShowRecents();
+                return;
+            }
             switch (mShortPressOnPowerBehavior) {
                 case SHORT_PRESS_POWER_NOTHING:
                     break;
@@ -1889,6 +1897,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             return;
         }
         switch (behavior) {
+            case CircaKeyPolicy.SHORT_PRESS_PRIMARY_CIRCA:
+                circaStemShortPress();
+                break;
             case SHORT_PRESS_PRIMARY_LAUNCH_ALL_APPS:
                 Intent allAppsIntent = new Intent(Intent.ACTION_ALL_APPS);
                 allAppsIntent.addFlags(
@@ -1925,6 +1936,42 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 }
                 break;
         }
+    }
+
+    /** Circa: crown short press. Home on top -> app list, anything else -> home. */
+    private void circaStemShortPress() {
+        int activityType = WindowConfiguration.ACTIVITY_TYPE_UNDEFINED;
+        try {
+            final RootTaskInfo info = mActivityManagerService.getFocusedRootTaskInfo();
+            if (info != null && info.configuration != null) {
+                activityType = info.configuration.windowConfiguration.getActivityType();
+            }
+        } catch (RemoteException e) {
+            Slog.e(TAG, "circaStemShortPress: could not get the focused task", e);
+        }
+        if (CircaKeyPolicy.stemShortPressAction(activityType)
+                == CircaKeyPolicy.StemAction.SHOW_APP_LIST) {
+            sendCloseSystemWindows(SYSTEM_DIALOG_REASON_RECENT_APPS);
+            startActivityAsUser(CircaKeyPolicy.buildAppListIntent(circaHomePackage()),
+                    UserHandle.CURRENT_OR_SELF);
+        } else {
+            launchHomeFromHotKey(DEFAULT_DISPLAY);
+        }
+    }
+
+    /** Circa: side button short press while the screen is on. */
+    private void circaShowRecents() {
+        sendCloseSystemWindows(SYSTEM_DIALOG_REASON_RECENT_APPS);
+        startActivityAsUser(CircaKeyPolicy.buildRecentsIntent(circaHomePackage()),
+                UserHandle.CURRENT_OR_SELF);
+    }
+
+    /** Package of the current HOME role holder, or null if it cannot be resolved. */
+    private String circaHomePackage() {
+        final Intent home = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME);
+        final ResolveInfo ri = mPackageManager.resolveActivityAsUser(home,
+                PackageManager.MATCH_DEFAULT_ONLY, mCurrentUserId);
+        return ri != null && ri.activityInfo != null ? ri.activityInfo.packageName : null;
     }
 
     private void stemPrimaryDoublePressAction(int behavior) {
@@ -1973,6 +2020,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
         switch (mLongPressOnStemPrimaryBehavior) {
             case LONG_PRESS_PRIMARY_NOTHING:
+                break;
+            case CircaKeyPolicy.LONG_PRESS_PRIMARY_GLOBAL_ACTIONS:
+                showGlobalActions();
                 break;
             case LONG_PRESS_PRIMARY_LAUNCH_VOICE_ASSISTANT:
                 final int stemPrimaryKeyDeviceId = INVALID_INPUT_DEVICE_ID;
@@ -2682,6 +2732,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         mLongPressOnBackBehavior = mContext.getResources().getInteger(
                 com.android.internal.R.integer.config_longPressOnBackBehavior);
 
+        mCircaPowerShortPressOpensRecents = mContext.getResources().getBoolean(
+                com.android.internal.R.bool.config_circaPowerShortPressOpensRecents);
         mLongPressOnPowerBehavior = mContext.getResources().getInteger(
                 com.android.internal.R.integer.config_longPressOnPowerBehavior);
         mLongPressOnPowerAssistantTimeoutMs = mContext.getResources().getInteger(
