@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Copyright (C) 2026 The Circa Project
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+-->
+<resources>
+    <!-- Circa: replace the phone notification shade / quick settings with the round Wear-style
+         tray (com.android.systemui.circa.shade). Off by default; a product overlay turns it on.
+         For testing on a userdebug build, `settings put global circa_wear_shade 1` and a
+         SystemUI restart also turn it on. -->
+    <bool name="config_circaWearShade">false</bool>
+
+    <!-- Circa: the tray's accent (active toggles, card titles, rings). Settings.Secure
+         "circa_accent_color" (an ARGB int) overrides it at runtime. -->
+    <color name="circa_shade_accent">#ff8ab4f8</color>
+
+    <!-- Circa: height of the top / bottom screen edge band a swipe must start in to open the
+         tray at its quick-settings / notifications end. -->
+    <dimen name="circa_shade_edge_top">36dp</dimen>
+    <dimen name="circa_shade_edge_bottom">36dp</dimen>
+</resources>
