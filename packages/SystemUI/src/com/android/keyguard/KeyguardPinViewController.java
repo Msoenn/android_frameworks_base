@@ -167,8 +167,10 @@ public class KeyguardPinViewController
         }
         if (com.android.systemui.circa.keyguard.CircaKeyguard.isEnabled(mView.getContext())) {
             // Circa: the flow helper brings the key back to VISIBLE; keep it invisible by alpha.
-            mOkButton.setAlpha(isAutoPinConfirmEnabledInSettings() && !mDisabledAutoConfirmation
-                    ? 0f : 1f);
+            if (mOkButton instanceof NumPadButton) {
+                ((NumPadButton) mOkButton).setCircaHidden(isAutoPinConfirmEnabledInSettings()
+                        && !mDisabledAutoConfirmation);
+            }
         }
     }
 
