@@ -168,6 +168,15 @@ public enum ScrimState {
         @ExperimentalCoroutinesApi
         @Override
         public void prepare(ScrimState previousState) {
+            if (sCircaOpaqueBouncer) {
+                // Circa: the PIN pad sits on pure black; a front scrim would cover it, so black goes
+                // behind.
+                mBehindAlpha = 1f;
+                mBehindTint = Color.BLACK;
+                mNotifAlpha = 0f;
+                mFrontAlpha = 0f;
+                return;
+            }
             if (Flags.bouncerUiRevamp()) {
                 // Add unlocked here because scrim state is unlocked when there is an app on top of
                 // the lockscreen and shade is pulled over it.
