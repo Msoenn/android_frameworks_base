@@ -195,7 +195,7 @@ public class KeyguardPinViewController
                 && !mDisabledAutoConfirmation);
         if (com.android.systemui.circa.keyguard.CircaKeyguard.isEnabled(mView.getContext())
                 && mPinLength != LockPatternUtils.PIN_LENGTH_UNAVAILABLE) {
-            mPasswordEntry.setCircaPinLength(mPinLength);
+            mPasswordEntry.setCircaPinLength((int) mPinLength);
         }
     }
 
