@@ -287,6 +287,7 @@ internal fun CircaTrayScreen(
                         quickSettings,
                         colors,
                         panelHeight,
+                        screenHeight,
                         onClose = close,
                         onEdit = { editing = true },
                     )
@@ -377,8 +378,8 @@ private fun ScrollIndicator(state: LazyListState, colors: CircaColors, modifier:
         val visibleFraction = (viewport / total).coerceIn(0.1f, 1f)
         val position = (scrolled / max(1f, total - viewport)).coerceIn(0f, 1f)
 
-        val strokePx = 4.dp.toPx()
-        val inset = 6.dp.toPx() + strokePx / 2f
+        val strokePx = 3.dp.toPx()
+        val inset = 2.dp.toPx() + strokePx / 2f
         val arcSize = Size(size.width - inset * 2, size.height - inset * 2)
         val topLeft = Offset(inset, inset)
         val sweepTotal = 50f
@@ -407,13 +408,43 @@ private fun ScrollIndicator(state: LazyListState, colors: CircaColors, modifier:
 
 // ---- quick settings -----------------------------------------------------------------------------
 
-/** Height of the quick-settings item for [tileCount] tiles: the grid, the phone pill, Edit. */
+/**
+ * Splits the tiles into rows of three; when that would leave a single tile in the last row, the
+ * first and last rows get two instead (7 tiles = 2-3-2), a honeycomb that fits the circle.
+ */
+internal fun <T> tileRows(tiles: List<T>): List<List<T>> {
+    if (tiles.size >= 4 && tiles.size % 3 == 1) {
+        val middle = tiles.subList(2, tiles.size - 2)
+        return listOf(tiles.take(2)) + middle.chunked(3) + listOf(tiles.takeLast(2))
+    }
+    return tiles.chunked(3)
+}
+
+/** Grid height for [rowCount] rows. */
+private fun gridHeight(rowCount: Int): Dp =
+    if (rowCount == 0) 0.dp else TILE_SIZE * rowCount + TILE_GAP * (rowCount - 1)
+
+/**
+ * Top of the grid: centred on the first screen when it fits (stock centres its 3 + 3 grid), but a
+ * full row of three never starts above [GRID_TOP], where the circle would cut its corners.
+ */
+private fun gridTop(rows: List<List<*>>, screenHeight: Dp): Dp {
+    val centred = (screenHeight - gridHeight(rows.size)) / 2
+    val min = if ((rows.firstOrNull()?.size ?: 0) >= 3) GRID_TOP else GRID_TOP_NARROW
+    return maxOf(centred, min)
+}
+
+/** Height of the quick-settings item: the grid, the phone pill, Edit. */
 internal fun quickSettingsHeight(tileCount: Int, screenHeight: Dp): Dp {
-    val rows = (tileCount + 2) / 3
-    val grid = if (rows == 0) 0.dp else TILE_SIZE * rows + TILE_GAP * (rows - 1)
-    val content = GRID_TOP + grid + PILL_GAP + PILL_HEIGHT + TILE_GAP + PILL_HEIGHT + QS_BOTTOM_SPACE
+    val rows = tileRows(List(tileCount) { it })
+    val content =
+        gridTop(rows, screenHeight) + gridHeight(rows.size) + PILL_GAP + PILL_HEIGHT + TILE_GAP +
+            PILL_HEIGHT + QS_BOTTOM_SPACE
     return maxOf(screenHeight + QS_EXTRA_HEIGHT, content)
 }
+
+/** A row of two may start higher: it is narrower than the circle's chord up there. */
+private val GRID_TOP_NARROW = 16.dp
 
 private val PILL_HEIGHT = 24.dp
 private val PILL_GAP = 4.dp
@@ -429,17 +460,20 @@ private fun QuickSettingsPanel(
     qs: CircaQuickSettings,
     colors: CircaColors,
     height: Dp,
+    screenHeight: Dp,
     onClose: () -> Unit,
     onEdit: () -> Unit,
 ) {
     val tiles = qs.tiles.value
+    val rows = tileRows(tiles)
     Box(Modifier.fillMaxWidth().height(height)) {
         Column(
-            modifier = Modifier.align(Alignment.TopCenter).padding(top = GRID_TOP),
+            modifier =
+                Modifier.align(Alignment.TopCenter).padding(top = gridTop(rows, screenHeight)),
             verticalArrangement = Arrangement.spacedBy(TILE_GAP),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            for (row in tiles.chunked(3)) {
+            for (row in rows) {
                 Row(horizontalArrangement = Arrangement.spacedBy(TILE_GAP)) {
                     for (tile in row) TileButton(tile, qs, colors, onClose)
                 }
@@ -858,27 +892,29 @@ private fun EditRow(
     modifier: Modifier,
     actions: @Composable () -> Unit,
 ) {
-    Row(
+    // Two lines - the name on top, the actions under it - so names are not cut by the buttons.
+    Column(
         modifier =
             modifier
                 .fillMaxWidth()
-                .height(44.dp)
-                .clip(CircleShape)
+                .clip(RoundedCornerShape(24.dp))
                 .background(colors.surface)
-                .padding(start = 12.dp, end = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
+                .padding(horizontal = 14.dp, vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        TileIcon(spec, tileIcon, icon, colors.onSurface, 18.dp)
-        Spacer(Modifier.width(8.dp))
-        Text(
-            text = label,
-            color = colors.onSurface,
-            fontSize = 13.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) { actions() }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            TileIcon(spec, tileIcon, icon, colors.onSurface, 18.dp)
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = label,
+                color = colors.onSurface,
+                fontSize = 13.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Spacer(Modifier.height(4.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { actions() }
     }
 }
 
