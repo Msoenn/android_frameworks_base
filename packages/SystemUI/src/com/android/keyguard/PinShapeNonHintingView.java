@@ -233,6 +233,9 @@ public class PinShapeNonHintingView extends LinearLayout implements PinShapeInpu
     }
 
     private int getPinShapeColor() {
+        if (com.android.systemui.circa.keyguard.CircaKeyguard.isEnabled(mContext)) {
+            return 0xffc7c8d0; // Circa: light dots on the black bouncer
+        }
         if (Flags.bouncerUiRevamp2()) {
             return mContext.getColor(Color.shape);
         } else {
