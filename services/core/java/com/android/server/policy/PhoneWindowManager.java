@@ -1324,7 +1324,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             Slog.d(TAG, "No behavior defined for power press count " + count);
         } else if (count == 1 && shouldHandleShortPressPowerAction(interactive, eventTime)) {
             if (CircaKeyPolicy.powerShortPressOpensRecents(mCircaPowerShortPressOpensRecents,
-                    interactive, keyguardOn())) {
+                    interactive, circaKeyguardOn())) {
                 circaShowRecents();
                 return;
             }
@@ -1905,7 +1905,12 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         Slog.d(TAG, "stemPrimarySinglePressAction: behavior=" + behavior);
         if (behavior == SHORT_PRESS_PRIMARY_NOTHING) return;
 
-        final boolean keyguardActive = mKeyguardDelegate != null && mKeyguardDelegate.isShowing();
+        // Circa: an insecure keyguard (no PIN set) does not swallow the crown - the launcher's watch
+        // face shows over it (showWhenLocked) and there is nothing to enter. A keyguard with a PIN
+        // does, and that is what raises the bouncer (docs/watch-ui/circa/buttons.md).
+        final boolean keyguardActive = behavior == CircaKeyPolicy.SHORT_PRESS_PRIMARY_CIRCA
+                ? circaKeyguardOn()
+                : mKeyguardDelegate != null && mKeyguardDelegate.isShowing();
         if (keyguardActive) {
             // If keyguarded then notify the keyguard.
             mKeyguardDelegate.onSystemKeyPressed(KeyEvent.KEYCODE_STEM_PRIMARY);
@@ -3901,6 +3906,20 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
     boolean keyguardOn() {
         return isKeyguardShowingAndNotOccluded() || inKeyguardRestrictedKeyInputMode();
+    }
+
+    /**
+     * Circa: {@link #keyguardOn()} but an insecure keyguard (no credential set) does not count. The
+     * launcher's watch face shows over it with {@code showWhenLocked}, so the crown and the side
+     * button must behave as they do on any face; only a keyguard with a PIN blocks them (the
+     * bouncer). CircaKeyPolicy.keyguardBlocksCircaButton, docs/watch-ui/circa/buttons.md.
+     */
+    private boolean circaKeyguardOn() {
+        if (mKeyguardDelegate == null) {
+            return false;
+        }
+        return CircaKeyPolicy.keyguardBlocksCircaButton(keyguardOn(),
+                mKeyguardDelegate.isSecure(mCurrentUserId));
     }
 
     private static final int[] WINDOW_TYPES_WHERE_HOME_DOESNT_WORK = {
