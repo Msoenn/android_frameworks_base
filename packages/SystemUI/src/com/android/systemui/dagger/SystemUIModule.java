@@ -83,6 +83,7 @@ import com.android.systemui.keyguard.data.quickaffordance.KeyguardDataQuickAffor
 import com.android.systemui.keyguard.shared.quickaffordance.KeyguardQuickAffordancesMetricsLogger;
 import com.android.systemui.keyguard.shared.quickaffordance.KeyguardQuickAffordancesMetricsLoggerImpl;
 import com.android.systemui.keyguard.ui.composable.LockscreenContent;
+import com.android.systemui.circa.ime.CircaImeModule;
 import com.android.systemui.circa.keyguard.CircaKeyguardModule;
 import com.android.systemui.circa.shade.CircaShadeModule;
 import com.android.systemui.lineage.LineageModule;
@@ -266,6 +267,7 @@ import javax.inject.Named;
         KeyboardModule.class,
         KeyguardDataQuickAffordanceModule.class,
         LetterboxModule.class,
+        CircaImeModule.class,
         CircaKeyguardModule.class,
         CircaShadeModule.class,
         LineageModule.class,
