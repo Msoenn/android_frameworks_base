@@ -448,7 +448,11 @@ private val GRID_TOP_NARROW = 16.dp
 
 private val PILL_HEIGHT = 24.dp
 private val PILL_GAP = 4.dp
-private val QS_BOTTOM_SPACE = 24.dp
+/**
+ * Space under the Edit pill: more than [STREAM_TOP], so when the tray opens at the notifications end
+ * (first card at STREAM_TOP) the pills are above the screen instead of peeking over the card.
+ */
+private val QS_BOTTOM_SPACE = STREAM_TOP + 16.dp
 
 /**
  * Stock's quick-settings grid (decisions.md "Quick settings A"), driven by the user's real tile
