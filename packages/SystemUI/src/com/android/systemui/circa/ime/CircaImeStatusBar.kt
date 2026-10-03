@@ -71,14 +71,19 @@ constructor(
                 showImeSwitcher: Boolean,
             ) {
                 if (displayId != Display.DEFAULT_DISPLAY) return
-                setStatusBarHidden((vis and InputMethodService.IME_VISIBLE) != 0)
+                // Always hidden (A12); nothing to toggle with the IME any more.
+                if ((vis and InputMethodService.IME_VISIBLE) != 0) setStatusBarHidden(true)
             }
         }
 
     override fun start() {
         enabled = CircaShadeStartable.isEnabled(context)
         if (!enabled) return
-        Log.i(TAG, "hiding the status bar while the IME is showing")
+        Log.i(TAG, "holding the status bar items hidden (audit A12; also covers the IME)")
+        // A12: Circa has no status bar, like Wear. The flags are held for the whole life of SystemUI
+        // (binder death releases them, the restart re-applies them). The IME callback below stays
+        // as a no-op guard: while the flags are held it never changes anything.
+        setStatusBarHidden(true)
         commandQueue.addCallback(commandQueueCallbacks)
     }
 

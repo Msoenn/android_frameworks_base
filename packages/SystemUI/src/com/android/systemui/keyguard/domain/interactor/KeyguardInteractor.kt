@@ -24,6 +24,7 @@ import com.android.systemui.bouncer.data.repository.KeyguardBouncerRepository
 import com.android.systemui.common.shared.model.NotificationContainerBounds
 import com.android.systemui.common.ui.domain.interactor.ConfigurationInteractor
 import com.android.systemui.dagger.SysUISingleton
+import com.android.systemui.circa.keyguard.CircaKeyguard
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.keyguard.data.repository.KeyguardRepository
 import com.android.systemui.keyguard.shared.model.BiometricUnlockModel
@@ -101,6 +102,7 @@ constructor(
         Provider<FromAlternateBouncerTransitionInteractor>,
     private val lockPatternUtils: LockPatternUtils,
     @Application applicationScope: CoroutineScope,
+    @Application private val circaContext: android.content.Context,
 ) {
     // TODO(b/296118689): move to a repository
     private val _notificationPlaceholderBounds = MutableStateFlow(NotificationContainerBounds())
@@ -463,7 +465,10 @@ constructor(
     /** Which keyguard state to use when the device goes to sleep. */
     val asleepKeyguardState: StateFlow<KeyguardState> =
         repository.isAodAvailable
-            .map { aodAvailable -> if (aodAvailable) AOD else DOZING }
+            // Circa: our launcher's dream owns the doze screen; never enter SystemUI's AOD UI (A02).
+            .map { aodAvailable ->
+                if (aodAvailable && !CircaKeyguard.isEnabled(circaContext)) AOD else DOZING
+            }
             .stateIn(applicationScope, SharingStarted.Eagerly, DOZING)
 
     /**
