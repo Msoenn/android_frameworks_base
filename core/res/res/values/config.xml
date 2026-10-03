@@ -1284,6 +1284,8 @@
          org.circa.intent.action.SHOW_RECENTS) instead of the config_shortPressOnPowerBehavior
          action. A press while the screen is off still wakes the device. -->
     <bool name="config_circaPowerShortPressOpensRecents">false</bool>
+    <!-- Circa: deactivate Factory Reset Protection automatically when no secret matches (devices without a setup wizard). -->
+    <bool name="config_circaDisableFrp">false</bool>
 
    <!-- Activity name for the default target activity to be launched. [DO NOT TRANSLATE] -->
    <string name="config_primaryShortPressTargetActivity" translatable="false"></string>

@@ -621,6 +621,18 @@ public class PersistentDataBlockService extends SystemService {
                 return true;
             }
 
+            // Circa: a watch without a setup wizard has nothing that could ever present the old
+            // secret (e.g. one left by the previous OS), so FRP would stay active and block every
+            // PDB write, crashing system_server in LockSettings. When the product opts out of FRP,
+            // reset to the default secret the same way the pre-V upgrade path above does.
+            if (mContext.getResources().getBoolean(R.bool.config_circaDisableFrp)) {
+                Slog.w(TAG, "Circa: FRP disabled by config, resetting to the default secret");
+                writeFrpMagicAndDefaultSecret();
+                mFrpActive = false;
+                setOldSettingForBackworkCompatibility(mFrpActive);
+                return true;
+            }
+
             Slog.e(TAG, "Did not find valid FRP secret, FRP remains active.");
             return false;
         }
