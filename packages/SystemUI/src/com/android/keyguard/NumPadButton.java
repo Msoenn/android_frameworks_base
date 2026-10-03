@@ -113,6 +113,7 @@ public class NumPadButton extends AlphaOptimizedImageButton implements NumPadAni
             // Circa: the delete key is a bare lavender icon, the enter key a pill like the digits.
             boolean delete = getId() == R.id.delete_button;
             if (mAnimator != null) mAnimator.applyCirca(getContext(), delete);
+            if (delete) setImageResource(R.drawable.pin_bouncer_delete_outline); // outlined, stock
             imageColor = delete ? CircaKeyguard.deleteIconColor(getContext())
                     : CircaKeyguard.onKeyColor(getContext());
         }

@@ -57,11 +57,7 @@ public class PinShapeHintingView extends LinearLayout implements PinShapeInput {
             ImageView pinDot = new ImageView(context, attrs);
             LayoutParams layoutParams = new LayoutParams(mDotDiameter, mDotDiameter);
             pinDot.setLayoutParams(layoutParams);
-            pinDot.setImageResource(PinBouncerConstants.pinDotAvd);
-            if (pinDot.getDrawable() != null) {
-                Drawable drawable = DrawableCompat.wrap(pinDot.getDrawable());
-                DrawableCompat.setTint(drawable, getPinHintDotColor());
-            }
+            applyHintDot(pinDot);
             addView(pinDot);
         }
     }
@@ -74,11 +70,7 @@ public class PinShapeHintingView extends LinearLayout implements PinShapeInput {
         for (int i = 0; i < mPinLength; i++) {
             ImageView pinDot = new ImageView(getContext());
             pinDot.setLayoutParams(new LayoutParams(mDotDiameter, mDotDiameter));
-            pinDot.setImageResource(PinBouncerConstants.pinDotAvd);
-            if (pinDot.getDrawable() != null) {
-                Drawable drawable = DrawableCompat.wrap(pinDot.getDrawable());
-                DrawableCompat.setTint(drawable, getPinHintDotColor());
-            }
+            applyHintDot(pinDot);
             addView(pinDot);
         }
     }
@@ -99,6 +91,10 @@ public class PinShapeHintingView extends LinearLayout implements PinShapeInput {
             return;
         }
         mPosition--;
+        if (com.android.systemui.circa.keyguard.CircaKeyguard.isEnabled(mContext)) {
+            applyHintDot((ImageView) getChildAt(mPosition));
+            return;
+        }
         setAnimatedDrawable((ImageView) getChildAt(mPosition), PinBouncerConstants.pinDeleteAvd,
                 getPinHintDotColor());
     }
@@ -134,9 +130,27 @@ public class PinShapeHintingView extends LinearLayout implements PinShapeInput {
         }
     }
 
+    /** The empty placeholder: Circa draws a filled grey dot (stock Wear), AOSP a ring. */
+    private void applyHintDot(ImageView pinDot) {
+        if (com.android.systemui.circa.keyguard.CircaKeyguard.isEnabled(mContext)) {
+            android.graphics.drawable.GradientDrawable dot =
+                    new android.graphics.drawable.GradientDrawable();
+            dot.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+            dot.setColor(getPinHintDotColor());
+            dot.setSize(mDotDiameter, mDotDiameter);
+            pinDot.setImageDrawable(dot);
+            return;
+        }
+        pinDot.setImageResource(PinBouncerConstants.pinDotAvd);
+        if (pinDot.getDrawable() != null) {
+            Drawable drawable = DrawableCompat.wrap(pinDot.getDrawable());
+            DrawableCompat.setTint(drawable, getPinHintDotColor());
+        }
+    }
+
     private int getPinHintDotColor() {
         if (com.android.systemui.circa.keyguard.CircaKeyguard.isEnabled(mContext)) {
-            return 0xff5f6368; // Circa: dim placeholder dots
+            return 0xff9aa0a6; // Circa: grey placeholder dots
         }
         if (Flags.bouncerUiRevamp2()) {
             return mContext.getColor(Color.hintDot);
