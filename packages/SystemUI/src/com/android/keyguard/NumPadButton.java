@@ -192,4 +192,18 @@ public class NumPadButton extends AlphaOptimizedImageButton implements NumPadAni
         mDefaultDrawable = drawableResId;
         setImageResource(mDefaultDrawable);
     }
+
+    private boolean mCircaHidden;
+
+    /** Circa: draw nothing (the flow keeps the key's cell; auto-confirm needs no Enter key). */
+    public void setCircaHidden(boolean hidden) {
+        mCircaHidden = hidden;
+        invalidate();
+    }
+
+    @Override
+    public void draw(android.graphics.Canvas canvas) {
+        if (mCircaHidden) return;
+        super.draw(canvas);
+    }
 }
