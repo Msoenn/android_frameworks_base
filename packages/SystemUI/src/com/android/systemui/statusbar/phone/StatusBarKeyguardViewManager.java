@@ -1585,6 +1585,10 @@ public class StatusBarKeyguardViewManager implements RemoteInputController.Callb
         boolean isWakeAndUnlockPulsing = mBiometricUnlockController != null
                 && mBiometricUnlockController.getMode() == MODE_WAKE_AND_UNLOCK_PULSING;
         boolean keyguardVisible = mKeyguardStateController.isVisible();
+        if (keyguardVisible && com.android.systemui.circa.keyguard.CircaKeyguard.isEnabled(mContext)) {
+            // Circa: a watch has no gesture pill over its keyguard / PIN pad.
+            return false;
+        }
         boolean hideWhileDozing = mDozing && !isWakeAndUnlockPulsing;
         boolean showNavBarForPulsing = !com.android.systemui.Flags.newDozingKeyguardStates()
                 && mPulsing && !mIsDocked;

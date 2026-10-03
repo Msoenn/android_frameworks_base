@@ -177,6 +177,10 @@ public abstract class KeyguardPinBasedInputView extends KeyguardAbsKeyInputView 
 
         // Set selected property on so the view can send accessibility events.
         mPasswordEntry.setSelected(true);
+        if (com.android.systemui.circa.keyguard.CircaKeyguard.isEnabled(mContext)) {
+            // Circa: dots on the black bouncer, no outlined entry bar (stock Wear).
+            mPasswordEntry.setBackground(null);
+        }
         if (!pinInputFieldStyledFocusState()) {
             mPasswordEntry.setDefaultFocusHighlightEnabled(false);
         }
