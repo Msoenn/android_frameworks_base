@@ -51,6 +51,16 @@ final class CircaKeyPolicy {
 
     private CircaKeyPolicy() {}
 
+    /**
+     * @return whether a crown press must be ignored right now: theater mode is on and the display
+     *         is not awake, so only the power key may wake the device (stock Wear). Without this the
+     *         crown's short press would open the app list on a dark screen (and start an activity
+     *         behind it) even though the crown is no longer allowed to wake the panel.
+     */
+    static boolean crownSuppressedByTheaterMode(boolean theaterModeOn, boolean displayAwake) {
+        return theaterModeOn && !displayAwake;
+    }
+
     /** The action to take for a crown short press. */
     enum StemAction { GO_HOME, SHOW_APP_LIST }
 

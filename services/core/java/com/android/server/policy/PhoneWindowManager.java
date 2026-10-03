@@ -616,6 +616,13 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     boolean mWakeGestureEnabledSetting;
     MyWakeGestureListener mWakeGestureListener;
 
+    /**
+     * Circa: {@code Settings.Global.THEATER_MODE_ON}, cached by {@link SettingsObserver}. While it is
+     * set, only the power key may wake the screen; the crown (key and rotation) must not. Read from
+     * the input thread, hence volatile.
+     */
+    volatile boolean mTheaterModeOn;
+
     int mLidKeyboardAccessibility;
     int mLidNavigationAccessibility;
     int mShortPressOnPowerBehavior;
@@ -1007,6 +1014,10 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     UserHandle.USER_ALL);
             resolver.registerContentObserver(Settings.Secure.getUriFor(
                     Settings.Secure.NAV_BAR_KIDS_MODE), false, this,
+                    UserHandle.USER_ALL);
+            // Circa: while theater mode is on, only the power key may wake the screen.
+            resolver.registerContentObserver(Settings.Global.getUriFor(
+                    Settings.Global.THEATER_MODE_ON), false, this,
                     UserHandle.USER_ALL);
 
             resolver.registerContentObserver(LineageSettings.Secure.getUriFor(
@@ -1875,6 +1886,11 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     }
 
     private void stemPrimaryPress(int count) {
+        if (CircaKeyPolicy.crownSuppressedByTheaterMode(mTheaterModeOn,
+                mDefaultDisplayPolicy.isAwake())) {
+            Slog.d(TAG, "stemPrimaryPress: suppressed, theater mode and the screen is off");
+            return;
+        }
         Slog.d(TAG, "stemPrimaryPress: " + count);
         if (count == 3) {
             stemPrimaryTriplePressAction(mTriplePressOnStemPrimaryBehavior);
@@ -2016,6 +2032,11 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     }
 
     private void stemPrimaryLongPress(long eventTime) {
+        if (CircaKeyPolicy.crownSuppressedByTheaterMode(mTheaterModeOn,
+                mDefaultDisplayPolicy.isAwake())) {
+            Slog.d(TAG, "stemPrimaryLongPress: suppressed, theater mode and the screen is off");
+            return;
+        }
         Slog.d(TAG, "stemPrimaryLongPress: "  + mLongPressOnStemPrimaryBehavior);
 
         switch (mLongPressOnStemPrimaryBehavior) {
@@ -3581,6 +3602,10 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             mStylusButtonsEnabled = Settings.Secure.getIntForUser(resolver,
                     Secure.STYLUS_BUTTONS_ENABLED, 1, UserHandle.USER_CURRENT) == 1;
             mInputManagerInternal.setStylusButtonMotionEventsEnabled(mStylusButtonsEnabled);
+
+            // Circa: the crown (key press and rotation) must not wake the screen in theater mode.
+            mTheaterModeOn = Settings.Global.getInt(resolver,
+                    Settings.Global.THEATER_MODE_ON, 0) == 1;
 
             kidsModeEnabled = Settings.Secure.getIntForUser(resolver,
                     Settings.Secure.NAV_BAR_KIDS_MODE, 0, UserHandle.USER_CURRENT) == 1;
@@ -5818,6 +5843,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             case KeyEvent.KEYCODE_CAMERA:
             case KeyEvent.KEYCODE_FOCUS:
                 return mWakeOnCameraKeyPress;
+            case KeyEvent.KEYCODE_STEM_PRIMARY:
+                // Circa: while theater mode is on, only the power key may wake the screen.
+                return !mTheaterModeOn;
         }
         return true;
     }
@@ -5860,6 +5888,10 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             case KeyEvent.KEYCODE_FOCUS:
                 return mWakeOnCameraKeyPress;
 
+            case KeyEvent.KEYCODE_STEM_PRIMARY:
+                // Circa: while theater mode is on, only the power key may wake the screen.
+                return !mTheaterModeOn;
+
             case KeyEvent.KEYCODE_STYLUS_BUTTON_PRIMARY:
             case KeyEvent.KEYCODE_STYLUS_BUTTON_SECONDARY:
             case KeyEvent.KEYCODE_STYLUS_BUTTON_TERTIARY:
@@ -5875,7 +5907,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     @Override
     public int interceptMotionBeforeQueueingNonInteractive(int displayId, int source, int action,
             long whenNanos, int policyFlags) {
-        if ((policyFlags & FLAG_WAKE) != 0) {
+        // Circa: the crown's rotary encoder is a motion wake source (device.wake=1, source
+        // SOURCE_ROTARY_ENCODER); while theater mode is on, only the power key may wake the screen.
+        if ((policyFlags & FLAG_WAKE) != 0 && !mTheaterModeOn) {
             if (mWindowWakeUpPolicy.wakeUpFromMotion(displayId, whenNanos / 1000000, source,
                     action == MotionEvent.ACTION_DOWN, mDeviceGoingToSleep)) {
                 // Woke up. Pass motion events to user.
@@ -7335,6 +7369,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 pw.println(WindowManagerFuncs.cameraLensStateToString(mCameraLensCoverState));
         pw.print(prefix); pw.print("mWakeGestureEnabledSetting=");
                 pw.println(mWakeGestureEnabledSetting);
+        pw.print(prefix); pw.print("mTheaterModeOn=");
+                pw.println(mTheaterModeOn);
 
         pw.print(prefix);
                 pw.print("mUiMode=");
