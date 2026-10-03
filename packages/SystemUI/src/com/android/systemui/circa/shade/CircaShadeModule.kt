@@ -17,10 +17,12 @@
 package com.android.systemui.circa.shade
 
 import com.android.systemui.CoreStartable
+import com.android.systemui.qs.tileimpl.QSTileImpl
 import dagger.Binds
 import dagger.Module
 import dagger.multibindings.ClassKey
 import dagger.multibindings.IntoMap
+import dagger.multibindings.StringKey
 
 /**
  * Circa's Wear-style shade. Always bound; [CircaShadeStartable.start] returns at once unless
@@ -33,4 +35,20 @@ interface CircaShadeModule {
     @IntoMap
     @ClassKey(CircaShadeStartable::class)
     fun bindCircaShadeStartable(startable: CircaShadeStartable): CoreStartable
+
+    /** Circa's tiles join SystemUI's tile map (QSFactoryImpl), like the Lineage tiles. */
+    @Binds
+    @IntoMap
+    @StringKey(CircaTheaterTile.TILE_SPEC)
+    fun bindCircaTheaterTile(tile: CircaTheaterTile): QSTileImpl<*>
+
+    @Binds
+    @IntoMap
+    @StringKey(CircaBrightnessTile.TILE_SPEC)
+    fun bindCircaBrightnessTile(tile: CircaBrightnessTile): QSTileImpl<*>
+
+    @Binds
+    @IntoMap
+    @StringKey(CircaSettingsTile.TILE_SPEC)
+    fun bindCircaSettingsTile(tile: CircaSettingsTile): QSTileImpl<*>
 }
