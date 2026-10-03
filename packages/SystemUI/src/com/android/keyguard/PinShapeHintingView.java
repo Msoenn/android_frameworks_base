@@ -130,6 +130,10 @@ public class PinShapeHintingView extends LinearLayout implements PinShapeInput {
         }
     }
 
+    private int dpToPx(int dp) {
+        return Math.round(dp * getResources().getDisplayMetrics().density);
+    }
+
     /** The empty placeholder: Circa draws a filled grey dot (stock Wear), AOSP a ring. */
     private void applyHintDot(ImageView pinDot) {
         if (com.android.systemui.circa.keyguard.CircaKeyguard.isEnabled(mContext)) {
@@ -138,7 +142,8 @@ public class PinShapeHintingView extends LinearLayout implements PinShapeInput {
             dot.setShape(android.graphics.drawable.GradientDrawable.OVAL);
             dot.setColor(getPinHintDotColor());
             dot.setSize(mDotDiameter, mDotDiameter);
-            pinDot.setImageDrawable(dot);
+            int inset = Math.max(0, (mDotDiameter - dpToPx(12)) / 2);
+            pinDot.setImageDrawable(new android.graphics.drawable.InsetDrawable(dot, inset));
             return;
         }
         pinDot.setImageResource(PinBouncerConstants.pinDotAvd);

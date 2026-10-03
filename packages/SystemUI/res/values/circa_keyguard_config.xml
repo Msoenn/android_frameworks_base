@@ -22,6 +22,11 @@
 
     <!-- Circa PIN pad palette (stock Wear OS, measured from its lock screen). -->
     <dimen name="circa_pin_digit_size">48dp</dimen>
+    <!-- Stock Wear pad at 384 px: 90 x 76 keys, 9 px column gap (7 here + the flow's 2), 5 px row gap
+         (the flow's). The device overlay sets num_pad_key_margin_end 2dp / entry_row_margin_bottom 5dp. -->
+    <dimen name="circa_pin_key_width">90dp</dimen>
+    <dimen name="circa_pin_key_height">76dp</dimen>
+    <dimen name="circa_pin_key_hmargin">7dp</dimen>
     <color name="circa_pin_key">#ffcdd4eb</color>
     <color name="circa_pin_key_pressed">#fffcfcff</color>
     <color name="circa_pin_on_key">#ff383f51</color>
