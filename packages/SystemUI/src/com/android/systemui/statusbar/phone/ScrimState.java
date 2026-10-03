@@ -102,6 +102,13 @@ public enum ScrimState {
                     updateScrimColor(mScrimBehind, 1f /* alpha */, mBackgroundColor);
                 }
             }
+            if (sCircaOpaqueBouncer) {
+                // Circa: nothing of the phone lockscreen / wallpaper shows (also behind the PIN pad,
+                // whose bouncer runs in this state).
+                mBehindAlpha = 1f;
+                mBehindTint = Color.BLACK;
+                mNotifAlpha = 0f;
+            }
         }
 
         @Override
