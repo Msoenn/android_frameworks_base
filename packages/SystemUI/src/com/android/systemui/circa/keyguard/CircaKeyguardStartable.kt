@@ -25,7 +25,7 @@ import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.dagger.qualifiers.Main
 import com.android.systemui.plugins.ActivityStarter
 import com.android.systemui.plugins.statusbar.StatusBarStateController
-import com.android.systemui.shade.NotificationShadeWindowController
+import com.android.systemui.statusbar.NotificationShadeWindowController
 import com.android.systemui.statusbar.policy.KeyguardStateController
 import java.io.PrintWriter
 import javax.inject.Inject
