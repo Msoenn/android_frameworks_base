@@ -62,6 +62,15 @@ public class CircaKeyPolicyTests {
     }
 
     @Test
+    public void circaButtons_areBlockedOnlyByASecureKeyguard() {
+        assertTrue(CircaKeyPolicy.keyguardBlocksCircaButton(
+                /* keyguardOn= */ true, /* keyguardSecure= */ true));
+        assertFalse(CircaKeyPolicy.keyguardBlocksCircaButton(true, false));
+        assertFalse(CircaKeyPolicy.keyguardBlocksCircaButton(false, true));
+        assertFalse(CircaKeyPolicy.keyguardBlocksCircaButton(false, false));
+    }
+
+    @Test
     public void crownPress_isSuppressedOnlyInTheaterModeWithTheScreenOff() {
         assertTrue(CircaKeyPolicy.crownSuppressedByTheaterMode(
                 /* theaterModeOn= */ true, /* displayAwake= */ false));

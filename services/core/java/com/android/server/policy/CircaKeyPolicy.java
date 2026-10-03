@@ -52,6 +52,17 @@ final class CircaKeyPolicy {
     private CircaKeyPolicy() {}
 
     /**
+     * @return whether a showing keyguard should block a Circa button behaviour (the crown's short
+     *         press, the side button's Recents). Only a keyguard that actually has a credential (a
+     *         PIN) blocks: Circa's launcher shows its watch face over an insecure keyguard with
+     *         {@code showWhenLocked}, so there is nothing to unlock and the buttons must work.
+     *         Mirrors AOSP's own test in {@code SHORT_PRESS_POWER_GO_TO_SLEEP}.
+     */
+    static boolean keyguardBlocksCircaButton(boolean keyguardOn, boolean keyguardSecure) {
+        return keyguardOn && keyguardSecure;
+    }
+
+    /**
      * @return whether a crown press must be ignored right now: theater mode is on and the display
      *         is not awake, so only the power key may wake the device (stock Wear). Without this the
      *         crown's short press would open the app list on a dark screen (and start an activity
