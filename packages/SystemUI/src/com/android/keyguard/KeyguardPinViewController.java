@@ -194,7 +194,10 @@ public class KeyguardPinViewController
      * Responsible for identifying if PIN hinting is to be enabled or not
      */
     private boolean isPinHinting() {
-        return mPinLength == DEFAULT_PIN_LENGTH;
+        // Circa: any known length hints (placeholder dots), not just six digits.
+        return mPinLength == DEFAULT_PIN_LENGTH
+                || (com.android.systemui.circa.keyguard.CircaKeyguard.isEnabled(mView.getContext())
+                && mPinLength != LockPatternUtils.PIN_LENGTH_UNAVAILABLE);
     }
 
     /**
@@ -205,6 +208,8 @@ public class KeyguardPinViewController
      */
     private boolean isAutoPinConfirmEnabledInSettings() {
         //Checks if user has enabled the auto confirm in Settings
+        android.util.Log.i("CircaKeyguard", "autoConfirm=" + mLockPatternUtils.isAutoPinConfirmEnabled(
+                mSelectedUserInteractor.getSelectedUserId()) + " pinLength=" + mPinLength);
         return mLockPatternUtils.isAutoPinConfirmEnabled(
                 mSelectedUserInteractor.getSelectedUserId())
                 && mPinLength != LockPatternUtils.PIN_LENGTH_UNAVAILABLE;
