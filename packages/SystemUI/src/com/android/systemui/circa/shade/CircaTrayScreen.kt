@@ -81,9 +81,6 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
@@ -94,7 +91,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
@@ -133,9 +129,6 @@ private const val DISMISS_FRACTION = 0.25f
 private const val CARD_DISMISS_FRACTION = 0.35f
 private const val SETTLE_MILLIS = 180
 
-/** Pulling down this far past the quick-settings top dismisses the tray (stock behaviour). */
-private val PULL_DISMISS = 56.dp
-
 /**
  * The tray is laid out for a 200 dp wide screen whatever the system density is (the watch runs
  * `wm density 192`, i.e. 320 dp across, for phone apps), so its geometry matches stock Wear and the
@@ -169,8 +162,8 @@ internal class CircaColors(val accent: Color) {
 
 /**
  * The tray: one vertically scrolling column, quick settings at the top and the notification
- * stream below. Swiping right (or BACK), scrolling past the quick-settings top with the crown,
- * or pulling down past it by touch, dismisses it.
+ * stream below. Swiping right, BACK, or an up-swipe from the bottom edge band (CircaEdgeSwipe)
+ * dismisses it; scrolling or pulling past the quick-settings top does not.
  */
 @Composable
 internal fun CircaTrayScreen(
@@ -210,32 +203,6 @@ internal fun CircaTrayScreen(
             enter.animateTo(0f, tween(220))
         }
 
-        val pullDismissPx = with(density) { PULL_DISMISS.toPx() }
-        val pullToDismiss = remember {
-            object : NestedScrollConnection {
-                var pulled = 0f
-
-                override fun onPostScroll(
-                    consumed: Offset,
-                    available: Offset,
-                    source: NestedScrollSource,
-                ): Offset {
-                    if (source != NestedScrollSource.UserInput) return Offset.Zero
-                    pulled = if (available.y > 0f) pulled + available.y else 0f
-                    if (pulled > pullDismissPx) {
-                        pulled = 0f
-                        close()
-                    }
-                    return Offset.Zero
-                }
-
-                override suspend fun onPreFling(available: Velocity): Velocity {
-                    pulled = 0f
-                    return Velocity.Zero
-                }
-            }
-        }
-
         val items = notifications.items.value
         val now = rememberClock()
 
@@ -265,11 +232,7 @@ internal fun CircaTrayScreen(
                 )
                 .onRotaryScrollEvent { event ->
                     val delta = event.verticalScrollPixels
-                    if (delta < 0f && !listState.canScrollBackward) {
-                        close()
-                    } else {
-                        scope.launch { listState.scrollBy(delta) }
-                    }
+                    scope.launch { listState.scrollBy(delta) }
                     true
                 }
                 .focusRequester(focusRequester)
@@ -280,7 +243,7 @@ internal fun CircaTrayScreen(
                 contentPadding = PaddingValues(horizontal = 12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(4.dp),
-                modifier = Modifier.fillMaxSize().nestedScroll(pullToDismiss),
+                modifier = Modifier.fillMaxSize(),
             ) {
                 item(key = "quick_settings") {
                     QuickSettingsPanel(

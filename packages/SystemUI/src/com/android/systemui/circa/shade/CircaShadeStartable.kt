@@ -139,7 +139,14 @@ constructor(
         edgeSwipe =
             CircaEdgeSwipe(context, inputManager, context.displayId) { end ->
                 if (tray.isOpen) {
-                    false
+                    // Open tray: only a swipe up from the bottom edge closes it; a pull down from
+                    // the top edge does nothing (it must not dismiss what it just opened).
+                    if (end == CircaTray.End.NOTIFICATIONS) {
+                        tray.close()
+                        true
+                    } else {
+                        false
+                    }
                 } else {
                     tray.open(end)
                     true
