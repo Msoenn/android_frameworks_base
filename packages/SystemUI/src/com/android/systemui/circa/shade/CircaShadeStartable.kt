@@ -51,6 +51,7 @@ import javax.inject.Inject
  *   `expandSettingsPanel()` / `collapsePanels()`, `cmd statusbar …`) goes to [CircaTray] instead;
  * * a swipe down from the top edge opens the tray at its quick-settings end and a swipe up from
  *   the bottom edge at its notifications end ([CircaEdgeSwipe]);
+ * * a new notification peeks as a card from the bottom ([CircaHeadsUp]);
  * * the tray closes when the screen turns off, on ACTION_CLOSE_SYSTEM_DIALOGS (home, stem/crown
  *   press) and when another task comes to the front.
  */
@@ -66,6 +67,7 @@ constructor(
     @Main private val mainExecutor: Executor,
     private val tray: CircaTray,
     private val theaterMode: CircaTheaterMode,
+    private val headsUp: CircaHeadsUp,
 ) : CoreStartable {
 
     private val disableToken = Binder()
@@ -121,6 +123,7 @@ constructor(
 
         tray.init()
         theaterMode.start()
+        headsUp.start()
         try {
             barService.disable(StatusBarManager.DISABLE_EXPAND, disableToken, context.packageName)
         } catch (e: RemoteException) {
@@ -159,6 +162,7 @@ constructor(
         // gesture monitor be garbage collected (its input channel closed a second after boot).
         pw.println(
             "CircaShadeStartable: enabled=$enabled trayOpen=${tray.isOpen} " +
+                "headsUp=${headsUp.isShowing} " +
                 "edgeSwipe=${edgeSwipe?.describe()}"
         )
     }

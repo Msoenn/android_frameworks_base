@@ -104,7 +104,7 @@ constructor(
         quickSettings.setListening(false)
     }
 
-    private fun accent(): Color {
+    internal fun accent(): Color {
         val override =
             Settings.Secure.getInt(context.contentResolver, ACCENT_SETTING, 0)
         return Color(if (override != 0) override else context.getColor(R.color.circa_shade_accent))
@@ -124,6 +124,7 @@ constructor(
                 )
                 .apply {
                     title = "CircaShade"
+                    accessibilityTitle = "Quick settings and notifications"
                     layoutInDisplayCutoutMode =
                         WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
                     fitInsetsTypes = 0
@@ -136,8 +137,10 @@ constructor(
     @SuppressLint("ViewConstructor")
     private inner class RootView(context: Context) : FrameLayout(context) {
         init {
+            importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES
             addView(
                 ComposeView(context).apply {
+                    importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES
                     setContent {
                         val current by session
                         current?.let { s ->

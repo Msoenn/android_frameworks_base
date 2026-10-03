@@ -101,7 +101,7 @@ constructor(
         items.value = flat.map(::toItem)
     }
 
-    private fun toItem(entry: NotificationEntry): CircaNotification {
+    internal fun toItem(entry: NotificationEntry): CircaNotification {
         val sbn = entry.sbn
         val n = sbn.notification
         val extras = n.extras
