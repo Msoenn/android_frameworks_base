@@ -3323,6 +3323,13 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         mSingleKeyGestureDetector = SingleKeyGestureDetector.get(mContext, looper);
         mSingleKeyGestureDetector.addRule(new PowerKeyRule());
         mSingleKeyGestureDetector.addRule(new BackKeyRule());
+        // Circa: AOSP registers the stem primary rule here (guarded by hasStemPrimaryBehavior());
+        // LineageOS dropped that hunk, so KEYCODE_STEM_PRIMARY was only ever delivered to the focused
+        // app and PhoneWindowManager's stem behaviours (config_shortPressOnStemPrimaryBehavior,
+        // config_longPressOnStemPrimaryBehavior) never ran outside the watch face.
+        if (hasStemPrimaryBehavior()) {
+            mSingleKeyGestureDetector.addRule(new StemPrimaryKeyRule());
+        }
         mSingleKeyGestureDetector.addRule(new StylusTailButtonRule());
         mSingleKeyGestureDetector.addRule(new AppSwitchKeyRule());
         mSingleKeyGestureDetector.addRule(new AssistKeyRule());
