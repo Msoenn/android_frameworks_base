@@ -60,6 +60,7 @@ import com.android.systemui.Flags;
 import com.android.systemui.animation.ShadeInterpolation;
 import com.android.systemui.bouncer.shared.constants.KeyguardBouncerConstants;
 import com.android.systemui.bouncer.ui.BouncerColors;
+import com.android.systemui.circa.keyguard.CircaKeyguard;
 import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.dock.DockManager;
@@ -1681,6 +1682,10 @@ public class ScrimController implements ViewTreeObserver.OnPreDrawListener, Dump
         } else {
             surface = mContext.getColor(
                     com.android.internal.R.color.materialColorSurface);
+        }
+        ScrimState.sCircaOpaqueBouncer = CircaKeyguard.isEnabled(mContext);
+        if (ScrimState.sCircaOpaqueBouncer) {
+            surface = CircaKeyguard.backdropColor();
         }
         for (ScrimState state : ScrimState.values()) {
             state.setBouncerSurfaceColor(surface);

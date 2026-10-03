@@ -104,6 +104,7 @@ import com.android.systemui.FontStyles;
 import com.android.systemui.Gefingerpoken;
 import com.android.systemui.bouncer.domain.interactor.BouncerInteractor;
 import com.android.systemui.bouncer.ui.BouncerColors;
+import com.android.systemui.circa.keyguard.CircaKeyguard;
 import com.android.systemui.classifier.FalsingA11yDelegate;
 import com.android.systemui.plugins.FalsingManager;
 import com.android.systemui.res.R;
@@ -861,7 +862,9 @@ public class KeyguardSecurityContainer extends ConstraintLayout {
         if (mTransparentModeEnabled) {
             setBackgroundColor(Color.TRANSPARENT);
         } else {
-            if (Flags.bouncerUiRevamp2()) {
+            if (CircaKeyguard.isEnabled(mContext)) {
+                setBackgroundColor(CircaKeyguard.backdropColor());
+            } else if (Flags.bouncerUiRevamp2()) {
                 setBackgroundColor(BouncerColors.surfaceColor(mContext, false));
             } else {
                 setBackgroundColor(

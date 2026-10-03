@@ -133,6 +133,12 @@ public enum ScrimState {
             mNotifAlpha = mClipQsScrim ? mDefaultScrimAlpha : 0;
             mNotifTint = Color.TRANSPARENT;
             mFrontAlpha = 0f;
+            if (sCircaOpaqueBouncer) {
+                // Circa: the watch PIN pad sits on pure black, nothing shows through.
+                mBehindAlpha = 1f;
+                mBehindTint = Color.BLACK;
+                mNotifAlpha = 0f;
+            }
         }
 
         @Override
@@ -509,6 +515,9 @@ public enum ScrimState {
     int mFrontTint = Color.TRANSPARENT;
     int mBehindTint = Color.TRANSPARENT;
     int mNotifTint = Color.TRANSPARENT;
+    /** Circa: the bouncer's scrim is opaque black (set by ScrimController, circa/keyguard). */
+    static boolean sCircaOpaqueBouncer = false;
+
     int mBouncerSurfaceColor = Color.TRANSPARENT;
 
     int mShadePanelColor = Color.TRANSPARENT;

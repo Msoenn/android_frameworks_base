@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Copyright (C) 2026 The Circa Project
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+-->
+<resources>
+    <!-- Circa: the watch keyguard (com.android.systemui.circa.keyguard): no phone lockscreen, a watch
+         face while locked, the round PIN pad in stock Wear colours. Off by default; a product overlay
+         turns it on. For testing, `settings put global circa_keyguard 1` and a SystemUI restart. -->
+    <bool name="config_circaKeyguard">false</bool>
+
+    <!-- Circa PIN pad palette (stock Wear OS, measured from its lock screen). -->
+    <color name="circa_pin_key">#ffcdd4eb</color>
+    <color name="circa_pin_key_pressed">#fffcfcff</color>
+    <color name="circa_pin_on_key">#ff383f51</color>
+    <color name="circa_pin_delete">#ffc6b8f9</color>
+</resources>

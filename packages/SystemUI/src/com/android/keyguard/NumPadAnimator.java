@@ -36,6 +36,7 @@ import com.android.systemui.Flags;
 import com.android.systemui.bouncer.shared.constants.PinBouncerConstants.Animation;
 import com.android.systemui.bouncer.shared.constants.PinBouncerConstants.Color;
 import com.android.systemui.bouncer.ui.BouncerColors;
+import com.android.systemui.circa.keyguard.CircaKeyguard;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -138,6 +139,24 @@ class NumPadAnimator {
 
         mBackground.setColor(mNormalBackgroundColor);
         mTextColorPrimary = context.getColor(isNumPadKey ? Color.digit : Color.action);
+        if (CircaKeyguard.isEnabled(context)) {
+            applyCirca(context, false);
+            return;
+        }
+        createAnimators();
+    }
+
+    /**
+     * Circa: stock Wear colours (lavender key, dark digit; the delete key is a bare lavender icon).
+     * @param bare true for the icon-only key: no resting background
+     */
+    void applyCirca(Context context, boolean bare) {
+        mNormalBackgroundColor = bare ? 0 : CircaKeyguard.keyColor(context);
+        mPressedBackgroundColor = bare ? 0x33ffffff : CircaKeyguard.keyPressedColor(context);
+        mTextColorPrimary = bare ? CircaKeyguard.deleteIconColor(context)
+                : CircaKeyguard.onKeyColor(context);
+        mTextColorPressed = bare ? mTextColorPrimary : CircaKeyguard.onKeyColor(context);
+        mBackground.setColor(mNormalBackgroundColor);
         createAnimators();
     }
 

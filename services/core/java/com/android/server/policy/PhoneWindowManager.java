@@ -1918,6 +1918,18 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             Slog.d(TAG, "stemPrimarySinglePressAction: skip due to keyguard");
             return;
         }
+        // Circa: a PIN keyguard that nothing occludes (before the first unlock after boot the
+        // launcher cannot run, so SystemUI's own face is what shows): the crown asks for the PIN.
+        if (behavior == CircaKeyPolicy.SHORT_PRESS_PRIMARY_CIRCA && mKeyguardDelegate != null
+                && mKeyguardDelegate.isShowing() && !mKeyguardDelegate.isOccluded()
+                && mKeyguardDelegate.isSecure(mCurrentUserId)) {
+            mKeyguardDelegate.dismiss(new com.android.internal.policy.IKeyguardDismissCallback.Stub() {
+                @Override public void onDismissError() {}
+                @Override public void onDismissSucceeded() {}
+                @Override public void onDismissCancelled() {}
+            }, null);
+            return;
+        }
         switch (behavior) {
             case CircaKeyPolicy.SHORT_PRESS_PRIMARY_CIRCA:
                 circaStemShortPress();

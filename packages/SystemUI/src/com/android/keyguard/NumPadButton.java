@@ -31,6 +31,7 @@ import androidx.annotation.Nullable;
 import com.android.systemui.Flags;
 import com.android.systemui.bouncer.shared.constants.PinBouncerConstants.Color;
 import com.android.systemui.bouncer.ui.BouncerColors;
+import com.android.systemui.circa.keyguard.CircaKeyguard;
 import com.android.systemui.res.R;
 
 /**
@@ -108,6 +109,13 @@ public class NumPadButton extends AlphaOptimizedImageButton implements NumPadAni
 
         int textColorResId = mIsTransparentMode ? Color.actionWithAutoConfirm : Color.action;
         int imageColor = getContext().getColor(textColorResId);
+        if (CircaKeyguard.isEnabled(getContext())) {
+            // Circa: the delete key is a bare lavender icon, the enter key a pill like the digits.
+            boolean delete = getId() == R.id.delete_button;
+            if (mAnimator != null) mAnimator.applyCirca(getContext(), delete);
+            imageColor = delete ? CircaKeyguard.deleteIconColor(getContext())
+                    : CircaKeyguard.onKeyColor(getContext());
+        }
         ((VectorDrawable) getDrawable()).setTintList(ColorStateList.valueOf(imageColor));
     }
 

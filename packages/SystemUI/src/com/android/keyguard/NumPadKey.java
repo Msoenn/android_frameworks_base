@@ -40,6 +40,7 @@ import com.android.settingslib.Utils;
 import com.android.systemui.FontStyles;
 import com.android.systemui.bouncer.shared.constants.PinBouncerConstants.Color;
 import com.android.systemui.bouncer.ui.helper.BouncerHapticPlayer;
+import com.android.systemui.circa.keyguard.CircaKeyguard;
 import com.android.systemui.res.R;
 
 /**
@@ -131,6 +132,10 @@ public class NumPadKey extends ViewGroup implements NumPadAnimationListener {
             mAnimator = null;
         }
 
+        if (CircaKeyguard.isEnabled(context)) {
+            reloadColors();
+        }
+
         if (bouncerUiRevamp2()) {
             mDigitText.setTypeface(
                     Typeface.create(FontStyles.GSF_LABEL_SMALL_EMPHASIZED, Typeface.NORMAL));
@@ -170,7 +175,9 @@ public class NumPadKey extends ViewGroup implements NumPadAnimationListener {
      * Reload colors from resources.
      **/
     public void reloadColors() {
-        int textColor = getContext().getColor(Color.digit);
+        int textColor = CircaKeyguard.isEnabled(getContext())
+                ? CircaKeyguard.onKeyColor(getContext())
+                : getContext().getColor(Color.digit);
         int klondikeColor = Utils.getColorAttr(getContext(), android.R.attr.textColorSecondary)
                 .getDefaultColor();
         mDigitText.setTextColor(textColor);

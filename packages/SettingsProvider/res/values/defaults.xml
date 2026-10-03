@@ -166,6 +166,10 @@
     <!-- Default for Settings.Secure.LOCK_SCREEN_SHOW_NOTIFICATIONS, 1==on -->
     <integer name="def_lock_screen_show_notifications">1</integer>
 
+    <!-- Default for Settings.Secure.LOCK_SCREEN_LOCK_AFTER_TIMEOUT (ms the screen can be off before the
+         lock engages; AOSP: 5000, Circa product overlay: 0, like stock Wear OS) -->
+    <integer name="def_lock_screen_lock_after_timeout">5000</integer>
+
     <!-- Default for Settings.Secure.LOCK_SCREEN_ALLOW_PRIVATE_NOTIFICATIONS -->
     <bool name="def_lock_screen_allow_private_notifications">true</bool>
 
