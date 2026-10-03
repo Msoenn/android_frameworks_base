@@ -118,6 +118,9 @@ public class PinShapeHintingView extends LinearLayout implements PinShapeInput {
     }
 
     private int getPinHintDotColor() {
+        if (com.android.systemui.circa.keyguard.CircaKeyguard.isEnabled(mContext)) {
+            return 0xff5f6368; // Circa: dim placeholder dots
+        }
         if (Flags.bouncerUiRevamp2()) {
             return mContext.getColor(Color.hintDot);
         } else {
@@ -126,6 +129,9 @@ public class PinShapeHintingView extends LinearLayout implements PinShapeInput {
     }
 
     private int getPinShapeColor() {
+        if (com.android.systemui.circa.keyguard.CircaKeyguard.isEnabled(mContext)) {
+            return 0xffc7c8d0;
+        }
         if (Flags.bouncerUiRevamp2()) {
             return mContext.getColor(Color.shape);
         } else {

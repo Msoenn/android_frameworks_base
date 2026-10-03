@@ -1137,7 +1137,9 @@ class SyntheticPasswordManager {
     private int derivePinLength(int sizeOfCredential, boolean isPinCredential, int userId) {
         if (!isPinCredential
                 || !mStorage.isAutoPinConfirmSettingEnabled(userId)
-                || sizeOfCredential < LockPatternUtils.MIN_AUTO_PIN_REQUIREMENT_LENGTH) {
+                || sizeOfCredential < (mContext.getResources().getBoolean(
+                        com.android.internal.R.bool.config_circaPinAutoConfirm)
+                        ? 4 : LockPatternUtils.MIN_AUTO_PIN_REQUIREMENT_LENGTH)) {
             return PIN_LENGTH_UNAVAILABLE;
         }
         return sizeOfCredential;

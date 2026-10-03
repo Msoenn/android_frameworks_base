@@ -734,7 +734,8 @@ public class LockPatternUtils {
      * @return true, if the entered pin should be auto confirmed
      */
     public boolean isAutoPinConfirmEnabled(int userId) {
-        return getBoolean(AUTO_PIN_CONFIRM, /* defaultValue= */ false, userId);
+        return getBoolean(AUTO_PIN_CONFIRM, /* defaultValue= */ mContext.getResources().getBoolean(
+                com.android.internal.R.bool.config_circaPinAutoConfirm), userId);
     }
 
     /** Returns if the given quality maps to an alphabetic password */

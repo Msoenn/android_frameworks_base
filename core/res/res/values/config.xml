@@ -1523,6 +1523,10 @@
     <!-- Is the lock-screen disabled for new users by default -->
     <bool name="config_disableLockscreenByDefault">false</bool>
 
+    <!-- Circa: PINs auto-confirm from 4 digits on (AOSP: opt-in setting, 6 digits and up), so the
+         PIN pad needs no Enter key and can show placeholder dots. -->
+    <bool name="config_circaPinAutoConfirm">false</bool>
+
     <!-- Provides default value for double line clock in lock screen setting:
          0 - Don't show double line clock
          1 - Show double line clock in lock screen (default) -->

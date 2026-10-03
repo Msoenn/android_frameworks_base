@@ -180,6 +180,11 @@ public abstract class KeyguardPinBasedInputView extends KeyguardAbsKeyInputView 
         if (com.android.systemui.circa.keyguard.CircaKeyguard.isEnabled(mContext)) {
             // Circa: dots on the black bouncer, no outlined entry bar (stock Wear).
             mPasswordEntry.setBackground(null);
+            // No caption: dots (placeholders when the PIN length is known) and the pad are all there is.
+            View caption = findViewById(R.id.bouncer_message_view);
+            if (caption != null) caption.setVisibility(View.GONE);
+            View captionArea = findViewById(R.id.bouncer_message_area);
+            if (captionArea != null) captionArea.setVisibility(View.GONE);
         }
         if (!pinInputFieldStyledFocusState()) {
             mPasswordEntry.setDefaultFocusHighlightEnabled(false);

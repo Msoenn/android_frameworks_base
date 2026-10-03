@@ -21,6 +21,7 @@
     <bool name="config_circaKeyguard">false</bool>
 
     <!-- Circa PIN pad palette (stock Wear OS, measured from its lock screen). -->
+    <dimen name="circa_pin_digit_size">40dp</dimen>
     <color name="circa_pin_key">#ffcdd4eb</color>
     <color name="circa_pin_key_pressed">#fffcfcff</color>
     <color name="circa_pin_on_key">#ff383f51</color>

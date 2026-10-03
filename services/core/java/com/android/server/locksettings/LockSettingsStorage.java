@@ -126,7 +126,8 @@ class LockSettingsStorage {
 
     @VisibleForTesting
     public boolean isAutoPinConfirmSettingEnabled(int userId) {
-        return getBoolean(LockPatternUtils.AUTO_PIN_CONFIRM, false, userId);
+        return getBoolean(LockPatternUtils.AUTO_PIN_CONFIRM, mContext.getResources().getBoolean(
+                com.android.internal.R.bool.config_circaPinAutoConfirm), userId);
     }
 
     @VisibleForTesting

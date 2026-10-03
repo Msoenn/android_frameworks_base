@@ -134,6 +134,11 @@ public class NumPadKey extends ViewGroup implements NumPadAnimationListener {
 
         if (CircaKeyguard.isEnabled(context)) {
             reloadColors();
+            // Stock Wear: large bold digits.
+            mDigitText.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX,
+                    getResources().getDimension(R.dimen.circa_pin_digit_size));
+            mDigitText.setTypeface(Typeface.create(Typeface.DEFAULT, 600, false));
+            mDigitText.setPadding(0, 0, 0, 0);
         }
 
         if (bouncerUiRevamp2()) {

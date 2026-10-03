@@ -25,6 +25,7 @@ import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.dagger.qualifiers.Main
 import com.android.systemui.plugins.ActivityStarter
 import com.android.systemui.plugins.statusbar.StatusBarStateController
+import com.android.systemui.shade.NotificationShadeWindowController
 import com.android.systemui.statusbar.policy.KeyguardStateController
 import java.io.PrintWriter
 import javax.inject.Inject
@@ -49,6 +50,7 @@ constructor(
     private val activityStarter: ActivityStarter,
     @Main private val handler: Handler,
     private val face: CircaKeyguardFace,
+    private val shadeWindowController: NotificationShadeWindowController,
 ) : CoreStartable {
 
     private var enabled = false
@@ -102,6 +104,12 @@ constructor(
 
     private fun evaluate() {
         if (shouldShowFace()) face.show() else face.hide()
+        // The notification-shade window hosts the bouncer; its content leaves a sliver at the bottom of
+        // the round panel unpainted (wallpaper shows). Black behind it while the keyguard is up.
+        shadeWindowController.windowRootView?.setBackgroundColor(
+            if (keyguardStateController.isShowing) android.graphics.Color.BLACK
+            else android.graphics.Color.TRANSPARENT
+        )
     }
 
     override fun dump(pw: PrintWriter, args: Array<out String>) {
