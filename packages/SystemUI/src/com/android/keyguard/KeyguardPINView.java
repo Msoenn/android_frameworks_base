@@ -175,16 +175,11 @@ public class KeyguardPINView extends KeyguardPinBasedInputView {
                 }
 
                 if (com.android.systemui.circa.keyguard.CircaKeyguard.isEnabled(mContext)) {
-                    // Circa: fixed key size (the ratio / max-width route left the keys 20% small).
-                    lp.dimensionRatio = null;
-                    lp.matchConstraintMaxWidth = 0;
-                    lp.width = mContext.getResources().getDimensionPixelSize(
-                            R.dimen.circa_pin_key_width);
-                    lp.height = mContext.getResources().getDimensionPixelSize(
-                            R.dimen.circa_pin_key_height);
-                    lp.bottomMargin = 0;
-                    lp.rightMargin = column != 2 ? mContext.getResources().getDimensionPixelSize(
-                            R.dimen.circa_pin_key_hmargin) : 0;
+                    // Circa: the constraint flow leaves the keys 20% under the stock size, so the
+                    // views are scaled up around their centre (cells keep their pitch).
+                    float scale = mContext.getResources().getFloat(R.dimen.circa_pin_key_scale);
+                    key.setScaleX(scale);
+                    key.setScaleY(scale);
                 }
 
                 key.setLayoutParams(lp);
