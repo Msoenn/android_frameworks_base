@@ -151,13 +151,13 @@ public class PasswordTextView extends BasePasswordTextView {
 
     @Override
     protected PinShapeInput inflatePinShapeInput(boolean isPinHinting) {
-        if (isPinHinting) {
-            return (PinShapeInput) LayoutInflater.from(mContext).inflate(
-                    R.layout.keyguard_pin_shape_hinting_view, null);
-        } else {
-            return (PinShapeInput) LayoutInflater.from(mContext).inflate(
-                    R.layout.keyguard_pin_shape_non_hinting_view, null);
+        PinShapeInput input = (PinShapeInput) LayoutInflater.from(mContext).inflate(
+                isPinHinting ? R.layout.keyguard_pin_shape_hinting_view
+                        : R.layout.keyguard_pin_shape_non_hinting_view, null);
+        if (com.android.systemui.circa.keyguard.CircaKeyguard.isEnabled(getContext())) {
+            input.setDrawColor(mDrawColor);
         }
+        return input;
     }
 
     @Override
