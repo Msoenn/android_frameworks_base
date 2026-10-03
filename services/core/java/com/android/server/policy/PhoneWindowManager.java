@@ -1905,12 +1905,13 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         Slog.d(TAG, "stemPrimarySinglePressAction: behavior=" + behavior);
         if (behavior == SHORT_PRESS_PRIMARY_NOTHING) return;
 
-        // Circa: an insecure keyguard (no PIN set) does not swallow the crown - the launcher's watch
-        // face shows over it (showWhenLocked) and there is nothing to enter. A keyguard with a PIN
-        // does, and that is what raises the bouncer (docs/watch-ui/circa/buttons.md).
-        final boolean keyguardActive = behavior == CircaKeyPolicy.SHORT_PRESS_PRIMARY_CIRCA
-                ? circaKeyguardOn()
-                : mKeyguardDelegate != null && mKeyguardDelegate.isShowing();
+        // Circa: the crown never goes to the keyguard's own key path. That path is a no-op in this
+        // tree (KeyguardViewMediator.onSystemKeyPressed does nothing), and the launcher already asks
+        // for the PIN when its toggle needs one (requireUnlock -> the bouncer / an insecure keyguard
+        // dismissed), which is where the crown's press then continues. So the crown always runs its
+        // behaviour, on any face (docs/watch-ui/circa/buttons.md).
+        final boolean keyguardActive = behavior != CircaKeyPolicy.SHORT_PRESS_PRIMARY_CIRCA
+                && mKeyguardDelegate != null && mKeyguardDelegate.isShowing();
         if (keyguardActive) {
             // If keyguarded then notify the keyguard.
             mKeyguardDelegate.onSystemKeyPressed(KeyEvent.KEYCODE_STEM_PRIMARY);
@@ -3910,9 +3911,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
     /**
      * Circa: {@link #keyguardOn()} but an insecure keyguard (no credential set) does not count. The
-     * launcher's watch face shows over it with {@code showWhenLocked}, so the crown and the side
-     * button must behave as they do on any face; only a keyguard with a PIN blocks them (the
-     * bouncer). CircaKeyPolicy.keyguardBlocksCircaButton, docs/watch-ui/circa/buttons.md.
+     * launcher's watch face shows over it with {@code showWhenLocked}, so the side button must open
+     * Recents as it does on any face; only a keyguard with a PIN blocks it.
+     * CircaKeyPolicy.keyguardBlocksCircaButton, docs/watch-ui/circa/buttons.md.
      */
     private boolean circaKeyguardOn() {
         if (mKeyguardDelegate == null) {
