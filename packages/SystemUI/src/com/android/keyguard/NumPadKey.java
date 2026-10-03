@@ -139,6 +139,7 @@ public class NumPadKey extends ViewGroup implements NumPadAnimationListener {
                     getResources().getDimension(R.dimen.circa_pin_digit_size));
             mDigitText.setTypeface(Typeface.create(Typeface.DEFAULT, 600, false));
             mDigitText.setPadding(0, 0, 0, 0);
+            applyCircaScale();
         }
 
         if (bouncerUiRevamp2()) {
@@ -282,5 +283,25 @@ public class NumPadKey extends ViewGroup implements NumPadAnimationListener {
 
     public void setBouncerHapticHelper(@Nullable BouncerHapticPlayer bouncerHapticPlayer) {
         mBouncerHapticPlayer = bouncerHapticPlayer;
+    }
+
+    private float mCircaScale = 1f;
+
+    // Circa: the constraint flow leaves the keys ~20% under the stock Wear size; every scale set on the
+    // view (the appear animation resets it to 1) is multiplied by a constant to draw them at stock size.
+    @Override
+    public void setScaleX(float scaleX) {
+        super.setScaleX(scaleX * mCircaScale);
+    }
+
+    @Override
+    public void setScaleY(float scaleY) {
+        super.setScaleY(scaleY * mCircaScale);
+    }
+
+    private void applyCircaScale() {
+        mCircaScale = getResources().getFloat(R.dimen.circa_pin_key_scale);
+        setScaleX(1f);
+        setScaleY(1f);
     }
 }
