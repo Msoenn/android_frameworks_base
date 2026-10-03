@@ -85,6 +85,7 @@ import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.dismiss
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -558,8 +559,7 @@ private fun TileButton(tile: CircaTile, qs: CircaQuickSettings, colors: CircaCol
                 background = state.background(colors),
                 onClick = { tile.toggle() },
                 onLongClick = {
-                    tile.longPress()
-                    onClose()
+                    if (tile.longPress()) onClose()
                 },
             ) {
                 TileIcon(tile.spec, tile.icon.value, null, state.tint(colors), TILE_ICON)
@@ -590,7 +590,7 @@ private fun RoundButton(
                     onLongClick = onLongClick,
                     onClick = onClick,
                 )
-                .semantics {
+                .semantics(mergeDescendants = true) {
                     contentDescription =
                         if (stateDescription != null) "$label, $stateDescription" else label
                 },
@@ -619,8 +619,7 @@ private fun BatteryButton(
         background = saver.background(colors),
         onClick = { if (saverState != CircaToggle.UNAVAILABLE) tile.toggle() },
         onLongClick = {
-            tile.longPress()
-            onClose()
+            if (tile.longPress()) onClose()
         },
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -657,8 +656,7 @@ private fun BrightnessButton(tile: CircaTile, colors: CircaColors, onClose: () -
         background = colors.surface,
         onClick = { tile.toggle() },
         onLongClick = {
-            tile.longPress()
-            onClose()
+            if (tile.longPress()) onClose()
         },
     ) {
         Canvas(Modifier.size(TILE_SIZE)) {
@@ -725,7 +723,7 @@ private fun SmallPill(
                 .background(colors.surface)
                 .combinedClickable(role = Role.Button, onClick = onClick)
                 .padding(horizontal = 9.dp)
-                .semantics { contentDescription = description },
+                .semantics(mergeDescendants = true) { contentDescription = description },
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(5.dp),
     ) {
@@ -790,14 +788,14 @@ private fun EditTilesScreen(
                 modifier = Modifier.edgeTransform(listState, "cur:" + t.spec, screenHeight),
             ) {
                 if (index > 0) {
-                    EditAction(CircaSymbols.ArrowUpward, "Move up", colors) { qs.moveTile(index, -1) }
+                    EditAction(CircaSymbols.ArrowUpward, "Move up", t.label.value.toString(), colors) { qs.moveTile(index, -1) }
                 }
                 if (index < tiles.size - 1) {
-                    EditAction(CircaSymbols.ArrowDownward, "Move down", colors) {
+                    EditAction(CircaSymbols.ArrowDownward, "Move down", t.label.value.toString(), colors) {
                         qs.moveTile(index, 1)
                     }
                 }
-                EditAction(CircaSymbols.Remove, "Remove", colors) { qs.removeTile(t.spec) }
+                EditAction(CircaSymbols.Remove, "Remove", t.label.value.toString(), colors) { qs.removeTile(t.spec) }
             }
         }
         item(key = "add_header") {
@@ -817,7 +815,7 @@ private fun EditTilesScreen(
                 colors = colors,
                 modifier = Modifier.edgeTransform(listState, "add:" + a.spec, screenHeight),
             ) {
-                EditAction(CircaSymbols.Add, "Add", colors, accent = true) { qs.addTile(a.spec) }
+                EditAction(CircaSymbols.Add, "Add", a.label.toString(), colors, accent = true) { qs.addTile(a.spec) }
             }
         }
         item(key = "done") {
@@ -889,6 +887,7 @@ private fun EditRow(
 private fun EditAction(
     icon: ImageVector,
     label: String,
+    tileName: String,
     colors: CircaColors,
     accent: Boolean = false,
     onClick: () -> Unit,
@@ -899,7 +898,7 @@ private fun EditAction(
                 .clip(CircleShape)
                 .background(if (accent) colors.accent else colors.surfaceHigh)
                 .combinedClickable(role = Role.Button, onClickLabel = label, onClick = onClick)
-                .semantics { contentDescription = label },
+                .semantics { contentDescription = "$label $tileName" },
         contentAlignment = Alignment.Center,
     ) {
         Icon(
@@ -954,6 +953,12 @@ private fun NotificationCard(
                 .clip(RoundedCornerShape(26.dp))
                 .background(colors.surface)
                 .combinedClickable(role = Role.Button, onClick = onOpen)
+                .semantics(mergeDescendants = true) {
+                    if (item.clearable) dismiss { onDismiss(); true }
+                    contentDescription =
+                        if (redacted) "${item.appName}, notification"
+                        else listOfNotNull(item.appName, item.title, item.text).joinToString(", ")
+                }
                 .padding(horizontal = 14.dp, vertical = 12.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1010,7 +1015,7 @@ private fun NotificationCard(
 
 /** The notification's small icon on a light disc, as stock's cards show it. */
 @Composable
-private fun AppIcon(icon: Drawable?, colors: CircaColors) {
+internal fun AppIcon(icon: Drawable?, colors: CircaColors) {
     val bitmap =
         remember(icon) {
             icon?.let { runCatching { it.toBitmap(48, 48).asImageBitmap() }.getOrNull() }

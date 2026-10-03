@@ -138,6 +138,9 @@ constructor(
 
     override fun getLongClickIntent(): Intent? = null
 
+    // No long-press page: never post a null intent to the ActivityStarter (audit A01).
+    override fun handleLongClick(expandable: Expandable?) {}
+
     override fun getTileLabel(): CharSequence = mContext.getString(R.string.circa_theater_mode)
 
     override fun handleUpdateState(state: BooleanState, arg: Any?) {
@@ -262,6 +265,8 @@ constructor(
     }
 
     override fun getLongClickIntent(): Intent? = null
+
+    override fun handleLongClick(expandable: Expandable?) {}
 
     override fun getTileLabel(): CharSequence = mContext.getString(R.string.circa_settings)
 

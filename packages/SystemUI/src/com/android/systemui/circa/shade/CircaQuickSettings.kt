@@ -38,6 +38,7 @@ import com.android.systemui.qs.external.CustomTile
 import com.android.systemui.qs.pipeline.domain.interactor.CurrentTilesInteractor
 import com.android.systemui.qs.pipeline.domain.model.TileModel
 import com.android.systemui.qs.pipeline.shared.TileSpec
+import com.android.systemui.qs.tileimpl.QSTileImpl
 import com.android.systemui.res.R
 import com.android.systemui.statusbar.policy.BatteryController
 import java.util.concurrent.Executor
@@ -57,7 +58,12 @@ enum class CircaToggle {
  * it: platform tiles, Circa's own and third-party TileService tiles alike. State, label and icon are
  * the tile's own, mirrored into Compose state while the tray listens.
  */
-class CircaTile(val spec: String, val tile: QSTile, private val mainExecutor: Executor) {
+class CircaTile(
+    val spec: String,
+    val tile: QSTile,
+    private val mainExecutor: Executor,
+    private val packageManager: PackageManager? = null,
+) {
     val state = mutableStateOf(CircaToggle.UNAVAILABLE)
     val label = mutableStateOf<CharSequence>("")
     val secondaryLabel = mutableStateOf<CharSequence?>(null)
@@ -88,8 +94,30 @@ class CircaTile(val spec: String, val tile: QSTile, private val mainExecutor: Ex
         if (tile.state.handlesSecondaryClick) tile.secondaryClick(null) else tile.click(null)
     }
 
-    /** Long press = the tile's settings page (the tile starts it, dismissing the keyguard). */
-    fun longPress() = tile.longClick(null)
+    /**
+     * Long press = the tile's settings page (the tile starts it, dismissing the keyguard). Never
+     * hands the tile a null or unanswerable intent: QSTileImpl.handleLongClick would post it to
+     * the ActivityStarter and SystemUI would crash (NullPointerException in
+     * startActivityDismissingKeyguard, audit A01). Returns whether anything was started.
+     */
+    fun longPress(): Boolean {
+        if (!tile.state.handlesLongClick) return false
+        if (tile is QSTileImpl<*>) {
+            val intent = tile.longClickIntent ?: return false
+            val pm = packageManager
+            if (pm != null) {
+                // Nothing answers it, or only the AOSP phone Settings does (it is not Circa's):
+                // do nothing rather than crash or open a phone-layout page.
+                val target = pm.resolveActivity(intent, 0)?.activityInfo?.packageName
+                if (target == null || target == AOSP_SETTINGS) {
+                    Log.w("CircaShade", "No Circa page for the long press of $spec: $intent -> $target")
+                    return false
+                }
+            }
+        }
+        tile.longClick(null)
+        return true
+    }
 
     private fun apply(s: QSTile.State) {
         label.value = s.label ?: tile.tileLabel ?: spec
@@ -104,6 +132,8 @@ class CircaTile(val spec: String, val tile: QSTile, private val mainExecutor: Ex
             }
     }
 }
+
+private const val AOSP_SETTINGS = "com.android.settings"
 
 /** A tile that can be added in edit mode. */
 data class CircaAvailableTile(val spec: String, val label: CharSequence, val icon: Drawable?)
@@ -182,7 +212,7 @@ constructor(
         val next =
             models.map { m ->
                 old[m.tile]
-                    ?: CircaTile(m.spec.spec, m.tile, mainExecutor).also {
+                    ?: CircaTile(m.spec.spec, m.tile, mainExecutor, context.packageManager).also {
                         it.attach()
                         if (listening) it.setListening(true)
                     }
