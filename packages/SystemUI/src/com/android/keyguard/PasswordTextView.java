@@ -126,6 +126,9 @@ public class PasswordTextView extends BasePasswordTextView {
                     getContext().getResources().getDimensionPixelSize(
                             R.dimen.password_char_padding));
             mDrawColor = a.getColor(R.styleable.PasswordTextView_android_textColor, Color.WHITE);
+            if (com.android.systemui.circa.keyguard.CircaKeyguard.isEnabled(getContext())) {
+                mDrawColor = 0xffc7c8d0;
+            }
             mDrawPaint.setColor(mDrawColor);
 
         } finally {
@@ -267,6 +270,9 @@ public class PasswordTextView extends BasePasswordTextView {
     public void reloadColors() {
         mDrawColor = Utils.getColorAttr(getContext(),
                 android.R.attr.textColorPrimary).getDefaultColor();
+        if (com.android.systemui.circa.keyguard.CircaKeyguard.isEnabled(getContext())) {
+            mDrawColor = 0xffc7c8d0; // Circa: light dots on the black bouncer
+        }
         mDrawPaint.setColor(mDrawColor);
         if (mPinShapeInput != null) {
             mPinShapeInput.setDrawColor(mDrawColor);
