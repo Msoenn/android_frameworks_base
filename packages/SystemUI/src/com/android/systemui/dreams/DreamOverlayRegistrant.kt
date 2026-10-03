@@ -26,6 +26,7 @@ import android.os.RemoteException
 import android.service.dreams.Flags
 import android.service.dreams.IDreamManager
 import android.util.Log
+import com.android.systemui.circa.shade.CircaShadeStartable
 import com.android.systemui.communal.domain.interactor.CommunalSettingsInteractor
 import com.android.systemui.dagger.qualifiers.SystemUser
 import com.android.systemui.dreams.dagger.DreamModule
@@ -78,6 +79,11 @@ constructor(
 
     internal val enabled: Boolean
         get() {
+            // Circa: the doze dream (the launcher's ambient dream) draws everything itself; SystemUI's
+            // overlay would add a second, transparent DreamActivity window on top of it.
+            if (CircaShadeStartable.isEnabled(context)) {
+                return false
+            }
             // Always disabled via setting
             if (
                 packageManager.getComponentEnabledSetting(overlayServiceComponent) ==
@@ -107,6 +113,9 @@ constructor(
      * device pool during development before enabling the component in said devices' manifest.
      */
     internal fun enableIfAvailable() {
+        if (CircaShadeStartable.isEnabled(context)) {
+            return
+        }
         // If the overlay is available in the manifest, then it is already available
         if (enabledInManifest) {
             return
