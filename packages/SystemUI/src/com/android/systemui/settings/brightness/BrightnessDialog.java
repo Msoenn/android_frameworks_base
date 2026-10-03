@@ -47,6 +47,7 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.logging.MetricsLogger;
 import com.android.internal.logging.nano.MetricsProto.MetricsEvent;
 import com.android.systemui.brightness.ui.viewmodel.BrightnessSliderViewModel;
+import com.android.systemui.circa.shade.CircaShadeStartable;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.qs.flags.QsInCompose;
 import com.android.systemui.res.R;
@@ -138,7 +139,9 @@ public class BrightnessDialog extends ComponentActivity {
     private void setWindowAttributes() {
         final Window window = getWindow();
 
-        window.setGravity(Gravity.TOP | Gravity.START);
+        // Circa: the round panel cuts the top corners, so the slider sits in the middle of the circle.
+        window.setGravity(CircaShadeStartable.Companion.isEnabled(this)
+                ? Gravity.CENTER : Gravity.TOP | Gravity.START);
         window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
         window.requestFeature(Window.FEATURE_NO_TITLE);
 
@@ -183,6 +186,12 @@ public class BrightnessDialog extends ComponentActivity {
             lp.width = shouldBeFullWidth ? windowWidth : windowWidth / 2;
         } else if (orientation == Configuration.ORIENTATION_PORTRAIT) {
             lp.width = windowWidth;
+        }
+        if (CircaShadeStartable.Companion.isEnabled(this)) {
+            // Inset by the circle's rounded_corner_content_padding-style margin so the track and its
+            // round ends stay inside the circle.
+            lp.width = windowWidth - 2 * getResources().getDimensionPixelSize(
+                    R.dimen.circa_dialog_side_inset);
         }
 
         container.setLayoutParams(lp);
