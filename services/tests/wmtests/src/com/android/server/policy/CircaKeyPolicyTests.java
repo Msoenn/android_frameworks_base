@@ -62,6 +62,15 @@ public class CircaKeyPolicyTests {
     }
 
     @Test
+    public void crownPress_isSuppressedOnlyInTheaterModeWithTheScreenOff() {
+        assertTrue(CircaKeyPolicy.crownSuppressedByTheaterMode(
+                /* theaterModeOn= */ true, /* displayAwake= */ false));
+        assertFalse(CircaKeyPolicy.crownSuppressedByTheaterMode(true, true));
+        assertFalse(CircaKeyPolicy.crownSuppressedByTheaterMode(false, false));
+        assertFalse(CircaKeyPolicy.crownSuppressedByTheaterMode(false, true));
+    }
+
+    @Test
     public void appListIntent_isExplicitToHomePackage() {
         Intent i = CircaKeyPolicy.buildAppListIntent("org.example.home");
         assertEquals(Intent.ACTION_ALL_APPS, i.getAction());
