@@ -66,9 +66,26 @@ public class PinShapeHintingView extends LinearLayout implements PinShapeInput {
         }
     }
 
+    /** Circa: rebuild the placeholder dots for a PIN of the given length (call while empty). */
+    public void setPinLength(int length) {
+        if (length == mPinLength || mPosition != 0) return;
+        removeAllViews();
+        mPinLength = length;
+        for (int i = 0; i < mPinLength; i++) {
+            ImageView pinDot = new ImageView(getContext());
+            pinDot.setLayoutParams(new LayoutParams(mDotDiameter, mDotDiameter));
+            pinDot.setImageResource(PinBouncerConstants.pinDotAvd);
+            if (pinDot.getDrawable() != null) {
+                Drawable drawable = DrawableCompat.wrap(pinDot.getDrawable());
+                DrawableCompat.setTint(drawable, getPinHintDotColor());
+            }
+            addView(pinDot);
+        }
+    }
+
     @Override
     public void append() {
-        if (mPosition == DEFAULT_PIN_LENGTH) {
+        if (mPosition >= mPinLength) {
             return;
         }
         setAnimatedDrawable((ImageView) getChildAt(mPosition), mPinShapeAdapter.getShape(mPosition),

@@ -160,6 +160,13 @@ public class PasswordTextView extends BasePasswordTextView {
         return input;
     }
 
+    /** Circa: the number of placeholder dots when the PIN length is known (hinting view). */
+    public void setCircaPinLength(int length) {
+        if (mPinShapeInput instanceof PinShapeHintingView) {
+            ((PinShapeHintingView) mPinShapeInput).setPinLength(length);
+        }
+    }
+
     @Override
     protected boolean shouldSendAccessibilityEvent() {
         return isFocused() || isSelected() && isShown();

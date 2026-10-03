@@ -165,6 +165,11 @@ public class KeyguardPinViewController
         } else {
             mOkButton.setVisibility(View.VISIBLE);
         }
+        if (com.android.systemui.circa.keyguard.CircaKeyguard.isEnabled(mView.getContext())) {
+            // Circa: the flow helper brings the key back to VISIBLE; keep it invisible by alpha.
+            mOkButton.setAlpha(isAutoPinConfirmEnabledInSettings() && !mDisabledAutoConfirmation
+                    ? 0f : 1f);
+        }
     }
 
     /**
@@ -188,6 +193,10 @@ public class KeyguardPinViewController
     void updatePinHinting() {
         mPasswordEntry.setIsPinHinting(isAutoPinConfirmEnabledInSettings() && isPinHinting()
                 && !mDisabledAutoConfirmation);
+        if (com.android.systemui.circa.keyguard.CircaKeyguard.isEnabled(mView.getContext())
+                && mPinLength != LockPatternUtils.PIN_LENGTH_UNAVAILABLE) {
+            mPasswordEntry.setCircaPinLength(mPinLength);
+        }
     }
 
     /**
@@ -208,8 +217,6 @@ public class KeyguardPinViewController
      */
     private boolean isAutoPinConfirmEnabledInSettings() {
         //Checks if user has enabled the auto confirm in Settings
-        android.util.Log.i("CircaKeyguard", "autoConfirm=" + mLockPatternUtils.isAutoPinConfirmEnabled(
-                mSelectedUserInteractor.getSelectedUserId()) + " pinLength=" + mPinLength);
         return mLockPatternUtils.isAutoPinConfirmEnabled(
                 mSelectedUserInteractor.getSelectedUserId())
                 && mPinLength != LockPatternUtils.PIN_LENGTH_UNAVAILABLE;
