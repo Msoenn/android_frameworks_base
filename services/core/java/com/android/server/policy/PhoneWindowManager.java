@@ -618,8 +618,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
     /**
      * Circa: {@code Settings.Global.THEATER_MODE_ON}, cached by {@link SettingsObserver}. While it is
-     * set, only the power key may wake the screen; the crown (key and rotation) must not. Read from
-     * the input thread, hence volatile.
+     * set, only the power key (the crown's press) may wake the screen; the side button
+     * (STEM_PRIMARY) and the crown's rotation must not. Read from the input thread, hence volatile.
      */
     volatile boolean mTheaterModeOn;
 
@@ -1015,7 +1015,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             resolver.registerContentObserver(Settings.Secure.getUriFor(
                     Settings.Secure.NAV_BAR_KIDS_MODE), false, this,
                     UserHandle.USER_ALL);
-            // Circa: while theater mode is on, only the power key may wake the screen.
+            // Circa: while theater mode is on, only the power key (crown press) may wake the screen.
             resolver.registerContentObserver(Settings.Global.getUriFor(
                     Settings.Global.THEATER_MODE_ON), false, this,
                     UserHandle.USER_ALL);
@@ -1323,8 +1323,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         } else if (count > 3 && count <= getMaxMultiPressPowerCount()) {
             Slog.d(TAG, "No behavior defined for power press count " + count);
         } else if (count == 1 && shouldHandleShortPressPowerAction(interactive, eventTime)) {
-            // Circa: the notifications behaviour (below) wins over the older Recents switch.
-            if (mShortPressOnPowerBehavior != CircaKeyPolicy.SHORT_PRESS_POWER_CIRCA_NOTIFICATIONS
+            // Circa: the Circa power behaviours (below) win over the older Recents switch.
+            if (!CircaKeyPolicy.isCircaPowerShortPress(mShortPressOnPowerBehavior)
                     && CircaKeyPolicy.powerShortPressOpensRecents(
                             mCircaPowerShortPressOpensRecents, interactive, circaKeyguardOn())) {
                 circaShowRecents();
@@ -1333,9 +1333,19 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             switch (mShortPressOnPowerBehavior) {
                 case SHORT_PRESS_POWER_NOTHING:
                     break;
+                case CircaKeyPolicy.SHORT_PRESS_POWER_CIRCA_APP_LIST:
+                    // Circa: the crown's press (the power key) opens the app list / goes home,
+                    // or asks for the PIN (docs/watch-ui/circa/buttons.md). The power key is never
+                    // dispatched, so it pokes no user activity by itself: without this the screen
+                    // timeout runs from the last touch and the app list / bouncer that just opened
+                    // can go dark within seconds.
+                    mPowerManager.userActivity(eventTime, PowerManager.USER_ACTIVITY_EVENT_BUTTON,
+                            0);
+                    circaAppListPress();
+                    break;
                 case CircaKeyPolicy.SHORT_PRESS_POWER_CIRCA_NOTIFICATIONS:
-                    // Circa: the side button toggles the notifications screen; a PIN keyguard
-                    // keeps the stock sleep (docs/watch-ui/circa/buttons.md).
+                    // Circa (older mapping): the power key toggles the notifications screen; a PIN
+                    // keyguard keeps the stock sleep (docs/watch-ui/circa/buttons.md).
                     if (CircaKeyPolicy.powerShortPressOpensNotifications(
                             mShortPressOnPowerBehavior, interactive, circaKeyguardOn())) {
                         toggleNotificationPanel();
@@ -1898,9 +1908,15 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     }
 
     private void stemPrimaryPress(int count) {
-        if (CircaKeyPolicy.crownSuppressedByTheaterMode(mTheaterModeOn,
+        if (CircaKeyPolicy.stemSuppressedByTheaterMode(mTheaterModeOn,
                 mDefaultDisplayPolicy.isAwake())) {
             Slog.d(TAG, "stemPrimaryPress: suppressed, theater mode and the screen is off");
+            return;
+        }
+        // Circa: the side button's press that woke the screen only wakes it (as the power key).
+        if (count == 1 && CircaKeyPolicy.stemShortPressOnlyWakes(mShortPressOnStemPrimaryBehavior,
+                mSingleKeyGestureDetector.beganFromNonInteractive())) {
+            Slog.d(TAG, "stemPrimaryPress: the press woke the screen, nothing else");
             return;
         }
         Slog.d(TAG, "stemPrimaryPress: " + count);
@@ -1917,12 +1933,11 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         Slog.d(TAG, "stemPrimarySinglePressAction: behavior=" + behavior);
         if (behavior == SHORT_PRESS_PRIMARY_NOTHING) return;
 
-        // Circa: the crown never goes to the keyguard's own key path. That path is a no-op in this
-        // tree (KeyguardViewMediator.onSystemKeyPressed does nothing), and the launcher already asks
-        // for the PIN when its toggle needs one (requireUnlock -> the bouncer / an insecure keyguard
-        // dismissed), which is where the crown's press then continues. So the crown always runs its
-        // behaviour, on any face (docs/watch-ui/circa/buttons.md).
-        final boolean keyguardActive = behavior != CircaKeyPolicy.SHORT_PRESS_PRIMARY_CIRCA
+        // Circa: the Circa stem behaviours never go to the keyguard's own key path. That path is a
+        // no-op in this tree (KeyguardViewMediator.onSystemKeyPressed does nothing): the app-list
+        // press asks for the PIN itself (circaAppListPress), and the notifications screen shows
+        // redacted over a PIN keyguard (docs/watch-ui/circa/buttons.md).
+        final boolean keyguardActive = !CircaKeyPolicy.isCircaStemShortPress(behavior)
                 && mKeyguardDelegate != null && mKeyguardDelegate.isShowing();
         if (keyguardActive) {
             // If keyguarded then notify the keyguard.
@@ -1930,21 +1945,13 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             Slog.d(TAG, "stemPrimarySinglePressAction: skip due to keyguard");
             return;
         }
-        // Circa: a PIN keyguard that nothing occludes (before the first unlock after boot the
-        // launcher cannot run, so SystemUI's own face is what shows): the crown asks for the PIN.
-        if (behavior == CircaKeyPolicy.SHORT_PRESS_PRIMARY_CIRCA && mKeyguardDelegate != null
-                && mKeyguardDelegate.isShowing() && !mKeyguardDelegate.isOccluded()
-                && mKeyguardDelegate.isSecure(mCurrentUserId)) {
-            mKeyguardDelegate.dismiss(new com.android.internal.policy.IKeyguardDismissCallback.Stub() {
-                @Override public void onDismissError() {}
-                @Override public void onDismissSucceeded() {}
-                @Override public void onDismissCancelled() {}
-            }, null);
-            return;
-        }
         switch (behavior) {
             case CircaKeyPolicy.SHORT_PRESS_PRIMARY_CIRCA:
-                circaStemShortPress();
+                circaAppListPress();
+                break;
+            case CircaKeyPolicy.SHORT_PRESS_PRIMARY_CIRCA_NOTIFICATIONS:
+                // Circa: the side button toggles the notifications screen.
+                toggleNotificationPanel();
                 break;
             case SHORT_PRESS_PRIMARY_LAUNCH_ALL_APPS:
                 Intent allAppsIntent = new Intent(Intent.ACTION_ALL_APPS);
@@ -1984,8 +1991,29 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
     }
 
-    /** Circa: crown short press. Home on top -> app list, anything else -> home. */
-    private void circaStemShortPress() {
+    /**
+     * Circa: the app-list press (crown short press, power behaviour 101; or the stem key with
+     * behaviour 3). A PIN keyguard that nothing occludes (before the first unlock after boot the
+     * launcher cannot run, so SystemUI's own face is what shows): asks for the PIN. Otherwise
+     * home on top -> app list (the launcher asks for the PIN itself when its face is over a PIN
+     * keyguard), anything else -> home.
+     */
+    private void circaAppListPress() {
+        if (mKeyguardDelegate != null && mKeyguardDelegate.isShowing()
+                && !mKeyguardDelegate.isOccluded()
+                && mKeyguardDelegate.isSecure(mCurrentUserId)) {
+            mKeyguardDelegate.dismiss(new com.android.internal.policy.IKeyguardDismissCallback.Stub() {
+                @Override public void onDismissError() {}
+                @Override public void onDismissSucceeded() {}
+                @Override public void onDismissCancelled() {}
+            }, null);
+            return;
+        }
+        circaShowAppListOrHome();
+    }
+
+    /** Circa: home on top -> the home app's app list, anything else -> home. */
+    private void circaShowAppListOrHome() {
         int activityType = WindowConfiguration.ACTIVITY_TYPE_UNDEFINED;
         try {
             final RootTaskInfo info = mActivityManagerService.getFocusedRootTaskInfo();
@@ -1993,7 +2021,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 activityType = info.configuration.windowConfiguration.getActivityType();
             }
         } catch (RemoteException e) {
-            Slog.e(TAG, "circaStemShortPress: could not get the focused task", e);
+            Slog.e(TAG, "circaShowAppListOrHome: could not get the focused task", e);
         }
         if (CircaKeyPolicy.stemShortPressAction(activityType)
                 == CircaKeyPolicy.StemAction.SHOW_APP_LIST) {
@@ -2005,11 +2033,36 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
     }
 
-    /** Circa: side button short press while the screen is on. */
+    /** Circa (older mapping): power short press while the screen is on -> launcher Recents. */
     private void circaShowRecents() {
         sendCloseSystemWindows(SYSTEM_DIALOG_REASON_RECENT_APPS);
         startActivityAsUser(CircaKeyPolicy.buildRecentsIntent(circaHomePackage()),
                 UserHandle.CURRENT_OR_SELF);
+    }
+
+    /**
+     * Circa: starts the system exercise app's {@link CircaKeyPolicy#ACTION_EXERCISE_LONG_PRESS}
+     * activity. False when no system app declares one (or the start failed), so the caller falls
+     * back to the power menu (docs/watch-ui/circa/buttons.md).
+     */
+    private boolean circaStartExerciseLongPress() {
+        final Intent intent = CircaKeyPolicy.buildExerciseLongPressIntent();
+        // Query, not resolve: with two handlers resolve returns the chooser (package "android").
+        final java.util.List<ResolveInfo> handlers = mPackageManager.queryIntentActivitiesAsUser(
+                intent, PackageManager.MATCH_DEFAULT_ONLY | PackageManager.MATCH_SYSTEM_ONLY,
+                mCurrentUserId);
+        final ResolveInfo ri = handlers == null || handlers.isEmpty() ? null : handlers.get(0);
+        if (ri == null || ri.activityInfo == null) {
+            return false;
+        }
+        intent.setClassName(ri.activityInfo.packageName, ri.activityInfo.name);
+        try {
+            startActivityAsUser(intent, UserHandle.CURRENT_OR_SELF);
+            return true;
+        } catch (RuntimeException e) {
+            Slog.w(TAG, "circaStartExerciseLongPress: could not start " + intent, e);
+            return false;
+        }
     }
 
     /** Package of the current HOME role holder, or null if it cannot be resolved. */
@@ -2062,7 +2115,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     }
 
     private void stemPrimaryLongPress(long eventTime) {
-        if (CircaKeyPolicy.crownSuppressedByTheaterMode(mTheaterModeOn,
+        if (CircaKeyPolicy.stemSuppressedByTheaterMode(mTheaterModeOn,
                 mDefaultDisplayPolicy.isAwake())) {
             Slog.d(TAG, "stemPrimaryLongPress: suppressed, theater mode and the screen is off");
             return;
@@ -2074,6 +2127,12 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 break;
             case CircaKeyPolicy.LONG_PRESS_PRIMARY_GLOBAL_ACTIONS:
                 showGlobalActions();
+                break;
+            case CircaKeyPolicy.LONG_PRESS_PRIMARY_CIRCA_EXERCISE_OR_GLOBAL_ACTIONS:
+                // Circa: side button long press -> the exercise app, else the power menu.
+                if (!circaStartExerciseLongPress()) {
+                    showGlobalActions();
+                }
                 break;
             case LONG_PRESS_PRIMARY_LAUNCH_VOICE_ASSISTANT:
                 final int stemPrimaryKeyDeviceId = INVALID_INPUT_DEVICE_ID;
@@ -3633,7 +3692,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     Secure.STYLUS_BUTTONS_ENABLED, 1, UserHandle.USER_CURRENT) == 1;
             mInputManagerInternal.setStylusButtonMotionEventsEnabled(mStylusButtonsEnabled);
 
-            // Circa: the crown (key press and rotation) must not wake the screen in theater mode.
+            // Circa: the side button and the crown's rotation must not wake the screen in theater
+            // mode (only the crown's press, the power key, does).
             mTheaterModeOn = Settings.Global.getInt(resolver,
                     Settings.Global.THEATER_MODE_ON, 0) == 1;
 
@@ -3935,8 +3995,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
     /**
      * Circa: {@link #keyguardOn()} but an insecure keyguard (no credential set) does not count. The
-     * launcher's watch face shows over it with {@code showWhenLocked}, so the side button must open
-     * Recents as it does on any face; only a keyguard with a PIN blocks it.
+     * launcher's watch face shows over it with {@code showWhenLocked}, so the power key's Circa
+     * press must work as it does on any face; only a keyguard with a PIN blocks it.
      * CircaKeyPolicy.keyguardBlocksCircaButton, docs/watch-ui/circa/buttons.md.
      */
     private boolean circaKeyguardOn() {
@@ -5888,7 +5948,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             case KeyEvent.KEYCODE_FOCUS:
                 return mWakeOnCameraKeyPress;
             case KeyEvent.KEYCODE_STEM_PRIMARY:
-                // Circa: while theater mode is on, only the power key may wake the screen.
+                // Circa: the side button. While theater mode is on, only the power key (the
+                // crown's press) may wake the screen.
                 return !mTheaterModeOn;
         }
         return true;
@@ -5933,7 +5994,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 return mWakeOnCameraKeyPress;
 
             case KeyEvent.KEYCODE_STEM_PRIMARY:
-                // Circa: while theater mode is on, only the power key may wake the screen.
+                // Circa: the side button. While theater mode is on, only the power key (the
+                // crown's press) may wake the screen.
                 return !mTheaterModeOn;
 
             case KeyEvent.KEYCODE_STYLUS_BUTTON_PRIMARY:
@@ -5952,7 +6014,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     public int interceptMotionBeforeQueueingNonInteractive(int displayId, int source, int action,
             long whenNanos, int policyFlags) {
         // Circa: the crown's rotary encoder is a motion wake source (device.wake=1, source
-        // SOURCE_ROTARY_ENCODER); while theater mode is on, only the power key may wake the screen.
+        // SOURCE_ROTARY_ENCODER); while theater mode is on, only the power key (the crown's press)
+        // may wake the screen.
         if ((policyFlags & FLAG_WAKE) != 0 && !mTheaterModeOn) {
             if (mWindowWakeUpPolicy.wakeUpFromMotion(displayId, whenNanos / 1000000, source,
                     action == MotionEvent.ACTION_DOWN, mDeviceGoingToSleep)) {

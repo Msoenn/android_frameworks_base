@@ -1210,6 +1210,9 @@
             8 - Go to glanceable hub or dream if possible, or sleep if neither is available (doze)
             9 - Go to dream if device is not dreaming, stop dream if device is dreaming, or sleep if
                 neither is available (doze)
+            100 - Circa: toggle the notifications screen (a PIN keyguard: go to sleep)
+            101 - Circa: open the home app's app list when home is on top, otherwise go home; a PIN
+                  keyguard that nothing occludes: the bouncer
     -->
     <integer name="config_shortPressOnPowerBehavior">1</integer>
 
@@ -1249,6 +1252,8 @@
             0 - Nothing
             1 - Launch voice assistant
             2 - Circa: show the global actions (power) menu
+            100 - Circa: start the activity for org.circa.action.EXERCISE_LONG_PRESS in a system
+                  app if there is one, otherwise show the global actions (power) menu
     -->
     <integer name="config_longPressOnStemPrimaryBehavior">0</integer>
 
@@ -1276,6 +1281,7 @@
            1 - Go to launch all apps
            2 - Launch target activity defined by config_primaryShortPressTargetActivity if available
            3 - Circa: open the home app's app list when home is on top, otherwise go home
+           100 - Circa: toggle the notifications screen (also over a PIN keyguard, redacted)
     -->
     <integer name="config_shortPressOnStemPrimaryBehavior">0</integer>
 

@@ -22,38 +22,80 @@ import android.content.Intent;
 /**
  * Circa watch button policy helpers used by {@link PhoneWindowManager}.
  *
- * <p>The behaviours themselves are selected by framework-res values that default to stock Android:
+ * <p>The Pixel Watch 2 has two buttons (docs/watch-ui/circa/buttons.md): the <b>crown</b>, whose
+ * press is {@code KEYCODE_POWER} (PMIC power key), and the <b>side button</b> next to it,
+ * {@code KEYCODE_STEM_PRIMARY} (scancode 114 on petc_qpnp_pon, mapped by the device keylayout).
+ * The behaviours are selected by framework-res values that default to stock Android:
  * <ul>
- *   <li>{@code config_shortPressOnStemPrimaryBehavior = 3} ({@link #SHORT_PRESS_PRIMARY_CIRCA}):
- *       crown short press is "smart": on home it opens the app list, anywhere else it goes home.
- *   <li>{@code config_longPressOnStemPrimaryBehavior = 2} ({@link
- *       #LONG_PRESS_PRIMARY_GLOBAL_ACTIONS}): crown long press opens the power menu.
- *   <li>{@code config_shortPressOnPowerBehavior = 100} ({@link
- *       #SHORT_PRESS_POWER_CIRCA_NOTIFICATIONS}): a short press of the side button while the screen
- *       is on and no PIN keyguard is showing toggles SystemUI's notifications screen; with a PIN
- *       keyguard showing it sleeps (stock {@code SHORT_PRESS_POWER_GO_TO_SLEEP}).
- *   <li>{@code config_circaPowerShortPressOpensRecents = true} (the first design, kept for
- *       builds without the Circa shade): the same press opens the launcher's Recents instead,
- *       unless the short-press behaviour is the notifications one above.
+ *   <li>{@code config_shortPressOnPowerBehavior = 101} ({@link
+ *       #SHORT_PRESS_POWER_CIRCA_APP_LIST}): crown short press while the screen is on: home on
+ *       top -> the home app's app list, anywhere else -> home; a PIN keyguard that nothing
+ *       occludes -> the bouncer.
+ *   <li>{@code config_shortPressOnStemPrimaryBehavior = 100} ({@link
+ *       #SHORT_PRESS_PRIMARY_CIRCA_NOTIFICATIONS}): side button short press toggles SystemUI's
+ *       notifications screen (also over a PIN keyguard, where it is redacted).
+ *   <li>{@code config_longPressOnStemPrimaryBehavior = 100} ({@link
+ *       #LONG_PRESS_PRIMARY_CIRCA_EXERCISE_OR_GLOBAL_ACTIONS}): side button long press starts or
+ *       stops an exercise ({@link #ACTION_EXERCISE_LONG_PRESS}) when a system app handles it,
+ *       otherwise the power menu; 2 ({@link #LONG_PRESS_PRIMARY_GLOBAL_ACTIONS}) is always the
+ *       power menu. The crown's long press is the power key's stock power menu.
+ *   <li>Older values, kept for builds that still select them: stem short press 3 ({@link
+ *       #SHORT_PRESS_PRIMARY_CIRCA}, the app-list press on the stem key), power short press 100
+ *       ({@link #SHORT_PRESS_POWER_CIRCA_NOTIFICATIONS}, the notifications press on the power key;
+ *       a PIN keyguard sleeps), and {@code config_circaPowerShortPressOpensRecents} (power short
+ *       press opens the launcher's Recents unless a Circa power behaviour is selected).
  * </ul>
+ *
+ * <p>A press that wakes the screen only wakes: the power key's short press is never handled when
+ * the gesture began non-interactive (AOSP), and {@link #stemShortPressOnlyWakes} does the same for
+ * the Circa stem behaviours. While theater mode is on only the power key (the crown) wakes the
+ * screen; the side button and the crown's rotation do not.
  *
  * <p>Both launcher-facing intents are sent explicitly to the package of the current HOME role
  * holder, so there is never a chooser even when several launchers are installed.
  */
 final class CircaKeyPolicy {
-    /** Crown short press: app list when on home, home otherwise. */
+    /** Stem short press: app list when on home, home otherwise (before 2026-10-04's swap). */
     static final int SHORT_PRESS_PRIMARY_CIRCA = 3;
 
-    /** Crown long press: show the global actions (power) menu. */
+    /**
+     * Stem (side button) short press: toggle the notifications screen (IStatusBarService
+     * .togglePanel, which the Circa shade routes to its notifications page). Far above AOSP's
+     * SHORT_PRESS_PRIMARY_* values (0..2).
+     */
+    static final int SHORT_PRESS_PRIMARY_CIRCA_NOTIFICATIONS = 100;
+
+    /** Stem (side button) long press: show the global actions (power) menu. */
     static final int LONG_PRESS_PRIMARY_GLOBAL_ACTIONS = 2;
 
     /**
-     * Side button short press ({@code config_shortPressOnPowerBehavior}, or the
-     * {@code Settings.Global.POWER_BUTTON_SHORT_PRESS} override): toggle the notifications screen
-     * (IStatusBarService.togglePanel, which the Circa shade routes to its notifications page).
-     * Far above AOSP's SHORT_PRESS_POWER_* values (0..9) so an upstream addition cannot collide.
+     * Stem (side button) long press: start the exercise app's activity for
+     * {@link #ACTION_EXERCISE_LONG_PRESS} when a preinstalled (system) app declares one, otherwise
+     * the global actions (power) menu. Far above AOSP's LONG_PRESS_PRIMARY_* values (0..2).
+     */
+    static final int LONG_PRESS_PRIMARY_CIRCA_EXERCISE_OR_GLOBAL_ACTIONS = 100;
+
+    /**
+     * Side-button long press contract for an exercise app: an activity (category DEFAULT) with
+     * this action in a system app is started with {@code FLAG_ACTIVITY_NEW_TASK}; it decides
+     * itself whether that starts or stops an exercise. Only system apps are considered, so an
+     * installed app cannot take over the button.
+     */
+    static final String ACTION_EXERCISE_LONG_PRESS = "org.circa.action.EXERCISE_LONG_PRESS";
+
+    /**
+     * Power short press ({@code config_shortPressOnPowerBehavior}, or the
+     * {@code Settings.Global.POWER_BUTTON_SHORT_PRESS} override): toggle the notifications screen;
+     * a PIN keyguard sleeps. The power-key design before the 2026-10-04 swap. Far above AOSP's
+     * SHORT_PRESS_POWER_* values (0..9) so an upstream addition cannot collide.
      */
     static final int SHORT_PRESS_POWER_CIRCA_NOTIFICATIONS = 100;
+
+    /**
+     * Power (crown) short press: the app-list press ({@link #stemShortPressAction}), the same one
+     * {@link #SHORT_PRESS_PRIMARY_CIRCA} gives the stem key.
+     */
+    static final int SHORT_PRESS_POWER_CIRCA_APP_LIST = 101;
 
     /**
      * Action of the intent sent to the home app to show its Recents page. Handled by an activity
@@ -65,7 +107,7 @@ final class CircaKeyPolicy {
     private CircaKeyPolicy() {}
 
     /**
-     * @return whether a showing keyguard should block the side button's Recents. Only a keyguard
+     * @return whether a showing keyguard should block the power key's Recents / notifications. Only a keyguard
      *         that actually has a credential (a PIN) blocks: Circa's launcher shows its watch face
      *         over an insecure keyguard with {@code showWhenLocked}, so there is nothing to unlock
      *         and the button must work. Mirrors AOSP's own test in
@@ -76,19 +118,40 @@ final class CircaKeyPolicy {
     }
 
     /**
-     * @return whether a crown press must be ignored right now: theater mode is on and the display
-     *         is not awake, so only the power key may wake the device (stock Wear). Without this the
-     *         crown's short press would open the app list on a dark screen (and start an activity
-     *         behind it) even though the crown is no longer allowed to wake the panel.
+     * @return whether a stem (side button) press must be ignored right now: theater mode is on and
+     *         the display is not awake, so only the power key (the crown) may wake the device (stock
+     *         Wear). Without this the side button's short press would act on a dark screen even
+     *         though it is no longer allowed to wake the panel.
      */
-    static boolean crownSuppressedByTheaterMode(boolean theaterModeOn, boolean displayAwake) {
+    static boolean stemSuppressedByTheaterMode(boolean theaterModeOn, boolean displayAwake) {
         return theaterModeOn && !displayAwake;
     }
 
-    /** The action to take for a crown short press. */
+    /** @return whether {@code behavior} is one of the Circa stem short-press behaviours. */
+    static boolean isCircaStemShortPress(int behavior) {
+        return behavior == SHORT_PRESS_PRIMARY_CIRCA
+                || behavior == SHORT_PRESS_PRIMARY_CIRCA_NOTIFICATIONS;
+    }
+
+    /** @return whether {@code behavior} is one of the Circa power short-press behaviours. */
+    static boolean isCircaPowerShortPress(int behavior) {
+        return behavior == SHORT_PRESS_POWER_CIRCA_NOTIFICATIONS
+                || behavior == SHORT_PRESS_POWER_CIRCA_APP_LIST;
+    }
+
+    /**
+     * @return whether a stem short press must only wake the screen: a Circa stem behaviour and the
+     *         press began while the device was not interactive (off or ambient). The same rule AOSP
+     *         applies to the power key's short press (shouldHandleShortPressPowerAction).
+     */
+    static boolean stemShortPressOnlyWakes(int behavior, boolean beganFromNonInteractive) {
+        return isCircaStemShortPress(behavior) && beganFromNonInteractive;
+    }
+
+    /** The action to take for an app-list press (crown short press). */
     enum StemAction { GO_HOME, SHOW_APP_LIST }
 
-    /** @return what a crown short press should do, given the type of the focused root task. */
+    /** @return what an app-list press should do, given the type of the focused root task. */
     static StemAction stemShortPressAction(int focusedActivityType) {
         return focusedActivityType == WindowConfiguration.ACTIVITY_TYPE_HOME
                 ? StemAction.SHOW_APP_LIST : StemAction.GO_HOME;
@@ -104,7 +167,7 @@ final class CircaKeyPolicy {
     }
 
     /**
-     * @return whether a side-button short press with {@link #SHORT_PRESS_POWER_CIRCA_NOTIFICATIONS}
+     * @return whether a power short press with {@link #SHORT_PRESS_POWER_CIRCA_NOTIFICATIONS}
      *         toggles the notifications screen; otherwise (a PIN keyguard is showing) it sleeps.
      *         Only called for a short press that began and ended with the screen on, so the press
      *         that wakes the watch from ambient or off never gets here.
@@ -112,6 +175,11 @@ final class CircaKeyPolicy {
     static boolean powerShortPressOpensNotifications(int behavior, boolean interactive,
             boolean keyguardBlocks) {
         return behavior == SHORT_PRESS_POWER_CIRCA_NOTIFICATIONS && interactive && !keyguardBlocks;
+    }
+
+    /** Builds the side-button long-press intent for the exercise app (not yet resolved). */
+    static Intent buildExerciseLongPressIntent() {
+        return new Intent(ACTION_EXERCISE_LONG_PRESS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
     }
 
     /** Builds the intent that opens the home app's app list ({@code ACTION_ALL_APPS}). */

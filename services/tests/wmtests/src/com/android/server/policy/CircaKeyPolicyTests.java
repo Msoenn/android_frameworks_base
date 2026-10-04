@@ -80,12 +80,46 @@ public class CircaKeyPolicyTests {
     }
 
     @Test
-    public void crownPress_isSuppressedOnlyInTheaterModeWithTheScreenOff() {
-        assertTrue(CircaKeyPolicy.crownSuppressedByTheaterMode(
+    public void sideButtonPress_isSuppressedOnlyInTheaterModeWithTheScreenOff() {
+        assertTrue(CircaKeyPolicy.stemSuppressedByTheaterMode(
                 /* theaterModeOn= */ true, /* displayAwake= */ false));
-        assertFalse(CircaKeyPolicy.crownSuppressedByTheaterMode(true, true));
-        assertFalse(CircaKeyPolicy.crownSuppressedByTheaterMode(false, false));
-        assertFalse(CircaKeyPolicy.crownSuppressedByTheaterMode(false, true));
+        assertFalse(CircaKeyPolicy.stemSuppressedByTheaterMode(true, true));
+        assertFalse(CircaKeyPolicy.stemSuppressedByTheaterMode(false, false));
+        assertFalse(CircaKeyPolicy.stemSuppressedByTheaterMode(false, true));
+    }
+
+    @Test
+    public void circaBehaviourValues_doNotCollideWithAosp() {
+        assertTrue(CircaKeyPolicy.isCircaStemShortPress(
+                CircaKeyPolicy.SHORT_PRESS_PRIMARY_CIRCA_NOTIFICATIONS));
+        assertTrue(CircaKeyPolicy.isCircaStemShortPress(CircaKeyPolicy.SHORT_PRESS_PRIMARY_CIRCA));
+        assertFalse(CircaKeyPolicy.isCircaStemShortPress(0));
+        assertFalse(CircaKeyPolicy.isCircaStemShortPress(1));
+        assertFalse(CircaKeyPolicy.isCircaStemShortPress(2));
+        assertTrue(CircaKeyPolicy.isCircaPowerShortPress(
+                CircaKeyPolicy.SHORT_PRESS_POWER_CIRCA_APP_LIST));
+        assertTrue(CircaKeyPolicy.isCircaPowerShortPress(
+                CircaKeyPolicy.SHORT_PRESS_POWER_CIRCA_NOTIFICATIONS));
+        for (int aosp = 0; aosp <= 9; aosp++) {
+            assertFalse(CircaKeyPolicy.isCircaPowerShortPress(aosp));
+        }
+    }
+
+    @Test
+    public void sideButtonPress_thatWokeTheScreen_onlyWakes() {
+        final int notif = CircaKeyPolicy.SHORT_PRESS_PRIMARY_CIRCA_NOTIFICATIONS;
+        assertTrue(CircaKeyPolicy.stemShortPressOnlyWakes(notif, /* beganFromNonInteractive= */ true));
+        assertFalse(CircaKeyPolicy.stemShortPressOnlyWakes(notif, false));
+        // AOSP stem behaviours keep their stock handling.
+        assertFalse(CircaKeyPolicy.stemShortPressOnlyWakes(1, true));
+    }
+
+    @Test
+    public void exerciseLongPressIntent_usesContractAction() {
+        Intent i = CircaKeyPolicy.buildExerciseLongPressIntent();
+        assertEquals("org.circa.action.EXERCISE_LONG_PRESS", i.getAction());
+        assertTrue((i.getFlags() & Intent.FLAG_ACTIVITY_NEW_TASK) != 0);
+        assertNull(i.getPackage());
     }
 
     @Test
