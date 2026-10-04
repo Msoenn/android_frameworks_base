@@ -26,9 +26,10 @@
     <color name="circa_shade_accent">#ff8ab4f8</color>
 
     <!-- Circa: height of the top / bottom screen edge band a swipe must start in to open the
-         tray at its quick-settings / notifications end. -->
-    <dimen name="circa_shade_edge_top">36dp</dimen>
-    <dimen name="circa_shade_edge_bottom">36dp</dimen>
+         quick-settings / notifications page. In the tray's 200 dp layout (a fifth of the
+         diameter), not in system dp: the watch runs density 160. -->
+    <dimen name="circa_shade_edge_top">40dp</dimen>
+    <dimen name="circa_shade_edge_bottom">40dp</dimen>
 
     <!-- Circa: the quick-settings tiles the Circa shade starts with (written to sysui_qs_tiles
          once, the first time the shade runs; edit mode changes them afterwards). -->

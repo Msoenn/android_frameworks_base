@@ -32,6 +32,10 @@ import kotlin.math.abs
  * The stock Wear edge swipes, system-wide: a swipe down that starts in the top edge band opens
  * the quick-settings page, a swipe up that starts in the bottom edge band the notifications page.
  *
+ * The bands are measured in the tray's own 200 dp layout ([TARGET_WIDTH_DP]), not in system dp:
+ * the watch runs density 160 (1 px per dp on its 384 px panel), where a 36 system-dp band was only
+ * 36 px (9 % of the screen) and most real swipes started below it.
+ *
  * A gesture monitor (the mechanism the back gesture uses) sees every touch on the display. Once a
  * vertical edge swipe passes the touch slop it pilfers the pointers, so the app below gets
  * ACTION_CANCEL and never sees the swipe. Horizontal movement first (back gesture, pagers)
@@ -60,8 +64,9 @@ class CircaEdgeSwipe(
     private var downY = 0f
 
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop.toFloat()
-    private val topBand = context.resources.getDimension(R.dimen.circa_shade_edge_top)
-    private val bottomBand = context.resources.getDimension(R.dimen.circa_shade_edge_bottom)
+    /** Band heights in the tray's layout dp (the dimens divided by the system density). */
+    private val topBandDp = layoutDp(R.dimen.circa_shade_edge_top)
+    private val bottomBandDp = layoutDp(R.dimen.circa_shade_edge_bottom)
     private val windowManager = context.getSystemService(WindowManager::class.java)
 
     fun start() {
@@ -78,7 +83,12 @@ class CircaEdgeSwipe(
     }
 
     /** For dumpsys; also reads [monitor] and [receiver], so R8 keeps them alive. */
-    fun describe(): String = "monitor=${monitor != null} receiver=${receiver != null}"
+    fun describe(): String =
+        "monitor=${monitor != null} receiver=${receiver != null} " +
+            "bands=${topBandDp}/${bottomBandDp} layout dp"
+
+    private fun layoutDp(id: Int): Float =
+        context.resources.getDimension(id) / context.resources.displayMetrics.density
 
     fun stop() {
         receiver?.dispose()
@@ -92,7 +102,11 @@ class CircaEdgeSwipe(
             MotionEvent.ACTION_DOWN -> {
                 downX = ev.rawX
                 downY = ev.rawY
-                val height = windowManager?.maximumWindowMetrics?.bounds?.height() ?: 0
+                val bounds = windowManager?.maximumWindowMetrics?.bounds
+                val height = bounds?.height() ?: 0
+                val scale = (bounds?.width() ?: 0) / TARGET_WIDTH_DP
+                val topBand = topBandDp * scale
+                val bottomBand = bottomBandDp * scale
                 candidate =
                     when {
                         height <= 0 -> Candidate.NONE
