@@ -40,4 +40,16 @@
     <string name="circa_edit_tiles">Edit</string>
     <string name="circa_edit_done">Done</string>
     <string name="circa_add_tiles">Add tiles</string>
+
+    <!-- Circa: side inset of the brightness dialog's slider so its round ends stay inside the circle
+         (px on purpose: the panel is 384 px whatever the density). -->
+    <dimen name="circa_dialog_side_inset">44px</dimen>
+
+    <!-- Circa volume indicator (circa/dialogs/CircaVolumeDialog) -->
+    <string name="circa_volume_media">Media</string>
+    <string name="circa_volume_ring">Ringtone</string>
+    <string name="circa_volume_alarm">Alarm</string>
+    <string name="circa_volume_call">Call</string>
+    <string name="circa_volume_notification">Notifications</string>
+    <string name="circa_volume_system">System</string>
 </resources>

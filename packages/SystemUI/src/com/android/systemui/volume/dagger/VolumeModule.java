@@ -22,6 +22,8 @@ import android.media.AudioManager;
 import android.os.Looper;
 
 import com.android.internal.jank.InteractionJankMonitor;
+import com.android.systemui.circa.dialogs.CircaVolumeDialog;
+import com.android.systemui.circa.shade.CircaShadeStartable;
 import com.android.systemui.CoreStartable;
 import com.android.systemui.Flags;
 import com.android.systemui.dump.DumpManager;
@@ -112,6 +114,7 @@ public interface VolumeModule {
     @Provides
     static VolumeDialog provideVolumeDialog(
             Lazy<VolumeDialogPlugin> volumeDialogProvider,
+            Lazy<CircaVolumeDialog> circaVolumeDialogProvider,
             Context context,
             VolumeDialogController volumeDialogController,
             AccessibilityManagerWrapper accessibilityManagerWrapper,
@@ -130,6 +133,10 @@ public interface VolumeModule {
             MSDLPlayer msdlPlayer,
             SystemClock systemClock,
             VolumeDialogInteractor interactor) {
+        if (CircaShadeStartable.Companion.isEnabled(context)) {
+            // Circa: round arc indicator instead of the phone's vertical slider panel.
+            return circaVolumeDialogProvider.get();
+        }
         if (Flags.volumeRedesign()) {
             return volumeDialogProvider.get();
         } else {
