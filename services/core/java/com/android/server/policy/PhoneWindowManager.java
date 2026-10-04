@@ -1993,8 +1993,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
     /**
      * Circa: the app-list press (crown short press, power behaviour 101; or the stem key with
-     * behaviour 3). A PIN keyguard that nothing occludes (before the first unlock after boot the
-     * launcher cannot run, so SystemUI's own face is what shows): asks for the PIN. Otherwise
+     * behaviour 3). A PIN keyguard that nothing occludes (SystemUI's own face before the first
+     * unlock after boot, or an app below the keyguard): asks for the PIN, then goes home. Otherwise
      * home on top -> app list (the launcher asks for the PIN itself when its face is over a PIN
      * keyguard), anything else -> home.
      */
@@ -2002,9 +2002,14 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         if (mKeyguardDelegate != null && mKeyguardDelegate.isShowing()
                 && !mKeyguardDelegate.isOccluded()
                 && mKeyguardDelegate.isSecure(mCurrentUserId)) {
+            // After the PIN, the face (as for the launcher's face over the keyguard): the press
+            // that asked for the PIN is spent, and the crown in an app means "go home" anyway.
             mKeyguardDelegate.dismiss(new com.android.internal.policy.IKeyguardDismissCallback.Stub() {
                 @Override public void onDismissError() {}
-                @Override public void onDismissSucceeded() {}
+                @Override public void onDismissSucceeded() {
+                    mHandler.post(() -> launchHomeFromHotKey(DEFAULT_DISPLAY,
+                            true /* awakenFromDreams */, false /* respectKeyguard */));
+                }
                 @Override public void onDismissCancelled() {}
             }, null);
             return;
