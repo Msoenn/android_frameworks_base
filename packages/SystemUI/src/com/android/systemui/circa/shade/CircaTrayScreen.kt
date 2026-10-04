@@ -392,7 +392,7 @@ private fun NotificationsPage(
                             ClearAllButton(
                                 colors,
                                 Modifier.padding(top = 6.dp)
-                                    .edgeTransform(listState, CLEAR_ALL_KEY, screenHeight),
+                                    .edgeTransform(listState, CLEAR_ALL_KEY, screenHeight, 24.dp),
                             ) {
                                 notifications.dismissAll()
                                 close()
@@ -457,27 +457,67 @@ private fun ClearAllButton(colors: CircaColors, modifier: Modifier, onClick: () 
 
 /**
  * Cards shrink and fade as they run into the round bezel at the top and bottom of the screen,
- * the way Wear's TransformingLazyColumn does it, instead of being clipped by the circle.
+ * the way Wear's TransformingLazyColumn does it, instead of being clipped by the circle: each item
+ * is scaled (about its edge nearer the centre) just enough that its rounded corners stay inside the
+ * circle, then faded with the same amount. [cornerRadius] is the item's own corner radius.
  */
-private fun Modifier.edgeTransform(state: LazyListState, key: Any, viewport: Dp): Modifier =
-    graphicsLayer {
-        val info = state.layoutInfo.visibleItemsInfo.firstOrNull { it.key == key }
-            ?: return@graphicsLayer
-        val viewportPx = viewport.toPx()
-        val zone = viewportPx * 0.22f
-        val top = info.offset.toFloat()
-        val bottom = top + info.size
-        val intoTop = zone - top
-        val intoBottom = bottom - (viewportPx - zone)
-        val into = max(intoTop, intoBottom).coerceAtLeast(0f)
-        val f = (into / (zone + info.size * 0.5f)).coerceIn(0f, 1f)
-        val scale = 1f - 0.22f * f
-        scaleX = scale
-        scaleY = scale
-        alpha = 1f - 0.7f * f
-        transformOrigin =
-            if (intoTop > intoBottom) TransformOrigin(0.5f, 1f) else TransformOrigin(0.5f, 0f)
+private fun Modifier.edgeTransform(
+    state: LazyListState,
+    key: Any,
+    viewport: Dp,
+    cornerRadius: Dp = CARD_RADIUS,
+): Modifier = graphicsLayer {
+    val layout = state.layoutInfo
+    val info = layout.visibleItemsInfo.firstOrNull { it.key == key } ?: return@graphicsLayer
+    val viewportPx = viewport.toPx()
+    val centre = viewportPx / 2f
+    val circle = centre - EDGE_MARGIN.toPx()
+    // Item offsets are relative to the content start, after the list's top padding.
+    val top = (info.offset - layout.viewportStartOffset).toFloat()
+    val h = info.size.toFloat()
+    val halfW = size.width / 2f
+    val r = cornerRadius.toPx().coerceAtMost(minOf(halfW, h / 2f))
+    val upper = top + h / 2f < centre
+    // Does the item, scaled by s about its inner edge, fit inside the circle? Checked at the start
+    // of the straight edge, the middle of the corner arc and the start of the straight side.
+    fun fits(sc: Float): Boolean {
+        val outer = if (upper) top + h - sc * h else top + sc * h
+        val dir = if (upper) 1f else -1f // from the outer edge towards the item's inside
+        val k = 0.293f * r
+        val points =
+            floatArrayOf(
+                sc * (halfW - r), outer,
+                sc * (halfW - k), outer + dir * sc * k,
+                sc * halfW, outer + dir * sc * r,
+            )
+        var i = 0
+        while (i < points.size) {
+            val dx = points[i]
+            val dy = points[i + 1] - centre
+            if (dx * dx + dy * dy > circle * circle) return false
+            i += 2
+        }
+        return true
     }
+    var scale = 1f
+    if (!fits(1f)) {
+        var lo = MIN_EDGE_SCALE
+        var hi = 1f
+        repeat(8) {
+            val mid = (lo + hi) / 2f
+            if (fits(mid)) lo = mid else hi = mid
+        }
+        scale = lo
+    }
+    scaleX = scale
+    scaleY = scale
+    alpha = (1f - (1f - scale) * 1.6f).coerceIn(0.25f, 1f)
+    transformOrigin = if (upper) TransformOrigin(0.5f, 1f) else TransformOrigin(0.5f, 0f)
+}
+
+private val CARD_RADIUS = 26.dp
+private val EDGE_MARGIN = 3.dp
+private const val MIN_EDGE_SCALE = 0.55f
 
 /** Stock's curved scroll indicator on the right edge of the circle. */
 @Composable
@@ -934,7 +974,7 @@ private fun EditTilesScreen(
                 tileIcon = t.icon.value,
                 icon = null,
                 colors = colors,
-                modifier = Modifier.edgeTransform(listState, "cur:" + t.spec, screenHeight),
+                modifier = Modifier.edgeTransform(listState, "cur:" + t.spec, screenHeight, 24.dp),
             ) {
                 if (index > 0) {
                     EditAction(CircaSymbols.ArrowUpward, "Move up", t.label.value.toString(), colors) { qs.moveTile(index, -1) }
@@ -962,7 +1002,7 @@ private fun EditTilesScreen(
                 tileIcon = null,
                 icon = a.icon,
                 colors = colors,
-                modifier = Modifier.edgeTransform(listState, "add:" + a.spec, screenHeight),
+                modifier = Modifier.edgeTransform(listState, "add:" + a.spec, screenHeight, 24.dp),
             ) {
                 EditAction(CircaSymbols.Add, "Add", a.label.toString(), colors, accent = true) { qs.addTile(a.spec) }
             }
@@ -1099,7 +1139,7 @@ private fun NotificationCard(
                         }
                     },
                 )
-                .clip(RoundedCornerShape(26.dp))
+                .clip(RoundedCornerShape(CARD_RADIUS))
                 .background(colors.surface)
                 .combinedClickable(role = Role.Button, onClick = onOpen)
                 .semantics(mergeDescendants = true) {
