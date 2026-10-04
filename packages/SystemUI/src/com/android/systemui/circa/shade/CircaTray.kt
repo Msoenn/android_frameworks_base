@@ -44,8 +44,8 @@ import javax.inject.Inject
  * (disabled) phone shade and the navigation bar) that shows one of two pages
  * (decisions.md "Shade split + side button", 2026-10-04):
  * * [Page.QUICK_SETTINGS]: the tile honeycomb and the pills, nothing else (swipe down from the top);
- * * [Page.NOTIFICATIONS]: the round notifications screen (side button, a heads-up card's swipe up,
- *   a swipe up from the bottom edge).
+ * * [Page.NOTIFICATIONS]: the round notifications screen (the side button / STEM_PRIMARY press, or a
+ *   heads-up card's swipe up; not a bottom-edge swipe since 2026-10-04).
  * [open] shows a page (switching if the other one is showing); [close] hides the window.
  *
  * The window is added once, on the first [open], and then only shown and hidden (root view
@@ -104,7 +104,7 @@ constructor(
         view.visibility = View.VISIBLE
     }
 
-    /** Side button: the notifications screen, or close it when it is already showing. */
+    /** Side button (STEM_PRIMARY): the notifications screen, or close it when it is already showing. */
     fun toggleNotifications() {
         if (page == Page.NOTIFICATIONS) close() else open(Page.NOTIFICATIONS)
     }

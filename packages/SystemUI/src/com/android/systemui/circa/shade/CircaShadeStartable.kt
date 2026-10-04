@@ -92,7 +92,7 @@ constructor(
             }
 
             override fun toggleNotificationsPanel() {
-                // The side button: quick settings showing -> switch to notifications.
+                // The side button (STEM_PRIMARY): quick settings showing -> switch to notifications.
                 tray.toggleNotifications()
             }
 
@@ -158,6 +158,11 @@ constructor(
                     } else {
                         false
                     }
+                } else if (page == CircaTray.Page.NOTIFICATIONS) {
+                    // Closed: a swipe up from the bottom edge opens nothing and is left to the app
+                    // (it fired while scrolling the launcher's lists). Notifications open only from
+                    // the side button (decisions.md "Notifications only via the side button").
+                    false
                 } else {
                     tray.open(page)
                     true

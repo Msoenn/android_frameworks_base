@@ -29,8 +29,10 @@ import com.android.systemui.res.R
 import kotlin.math.abs
 
 /**
- * The stock Wear edge swipes, system-wide: a swipe down that starts in the top edge band opens
- * the quick-settings page, a swipe up that starts in the bottom edge band the notifications page.
+ * The edge swipes, system-wide: a swipe down that starts in the top edge band opens the
+ * quick-settings page. A swipe up that starts in the bottom edge band is reported too, but only
+ * closes an open tray: it no longer opens the notifications page (2026-10-04, notifications open
+ * only from the side button; CircaShadeStartable decides, and an unused swipe is not pilfered).
  *
  * The bands are measured in the tray's own 200 dp layout ([TARGET_WIDTH_DP]), not in system dp:
  * the watch runs density 160 (1 px per dp on its 384 px panel), where a 36 system-dp band was only
