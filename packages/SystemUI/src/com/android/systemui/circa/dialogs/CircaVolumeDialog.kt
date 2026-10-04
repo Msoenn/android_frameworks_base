@@ -40,6 +40,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.Canvas
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -59,6 +60,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.compose.ui.platform.ComposeView
@@ -72,6 +74,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.android.systemui.compose.ComposeInitializer
+import com.android.systemui.circa.shade.CircaSymbols
 import com.android.systemui.circa.shade.CircaTray
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
@@ -362,16 +365,16 @@ constructor(
                 )
                 Spacer(Modifier.size(4.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    StepButton("−", "Volume down", accent) { changeLevel(level - 1) }
+                    StepButton(CircaSymbols.Remove, "Volume down", accent) { changeLevel(level - 1) }
                     Spacer(Modifier.width(14.dp))
-                    StepButton("+", "Volume up", accent) { changeLevel(level + 1) }
+                    StepButton(CircaSymbols.Add, "Volume up", accent) { changeLevel(level + 1) }
                 }
             }
         }
     }
 
     @Composable
-    private fun StepButton(label: String, description: String, accent: Color, onClick: () -> Unit) {
+    private fun StepButton(icon: ImageVector, description: String, accent: Color, onClick: () -> Unit) {
         Box(
             Modifier.size(BUTTON_DP.dp)
                 .clip(CircleShape)
@@ -387,7 +390,7 @@ constructor(
                 },
             contentAlignment = Alignment.Center,
         ) {
-            Text(label, color = accent, fontSize = 24.sp, fontWeight = FontWeight.Medium)
+            Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(24.dp))
         }
     }
 

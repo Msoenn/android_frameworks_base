@@ -148,7 +148,7 @@ constructor(
         state.value = on
         state.state = if (on) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
         state.label = mContext.getString(R.string.circa_theater_mode)
-        state.icon = maybeLoadResourceIcon(R.drawable.circa_ic_theaters)
+        state.icon = maybeLoadResourceIcon(R.drawable.circa_ic_movie)
         state.hasLongClickEffect = false
     }
 
