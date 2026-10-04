@@ -94,7 +94,7 @@ import kotlinx.coroutines.launch
  * round card up from the bottom of the face for a few seconds.
  *
  * * tap: opens the notification (like tapping its card in the tray);
- * * swipe up: opens the tray at the notifications end;
+ * * swipe up: opens the notifications screen;
  * * swipe down or sideways: dismisses the peek only (the notification stays in the tray);
  * * nothing: the card slides away after [HIDE_MILLIS].
  *
@@ -256,7 +256,7 @@ constructor(
                                         },
                                         onOpenTray = {
                                             hide()
-                                            tray.open(CircaTray.End.NOTIFICATIONS)
+                                            tray.open(CircaTray.Page.NOTIFICATIONS)
                                         },
                                         onGone = ::hide,
                                         trayOpen = { tray.isOpen },

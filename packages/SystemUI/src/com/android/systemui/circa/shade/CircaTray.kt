@@ -41,9 +41,12 @@ import javax.inject.Inject
 
 /**
  * The Wear tray: one full-screen window (TYPE_NAVIGATION_BAR_PANEL: above the keyguard, the
- * (disabled) phone shade and the navigation bar), holding
- * a Compose column with quick settings at the top and the notification stream below them
- * (research/wear-reference-tour.md §5). [open] shows it scrolled to either end; [close] hides it.
+ * (disabled) phone shade and the navigation bar) that shows one of two pages
+ * (decisions.md "Shade split + side button", 2026-10-04):
+ * * [Page.QUICK_SETTINGS]: the tile honeycomb and the pills, nothing else (swipe down from the top);
+ * * [Page.NOTIFICATIONS]: the round notifications screen (side button, a heads-up card's swipe up,
+ *   a swipe up from the bottom edge).
+ * [open] shows a page (switching if the other one is showing); [close] hides the window.
  *
  * The window is added once, on the first [open], and then only shown and hidden (root view
  * visibility), so opening is cheap. It is focusable while shown, so the crown's rotary events
@@ -59,13 +62,13 @@ constructor(
     val notifications: CircaNotifications,
     private val falsingCollector: FalsingCollector,
 ) {
-    enum class End {
+    enum class Page {
         QUICK_SETTINGS,
         NOTIFICATIONS,
     }
 
-    /** One opening of the tray; a new id resets the scroll position and the enter animation. */
-    data class Session(val end: End, val id: Int, val accent: Color, val redacted: Boolean)
+    /** One opening of a page; a new id resets the scroll position and the enter animation. */
+    data class Session(val page: Page, val id: Int, val accent: Color, val redacted: Boolean)
 
     private val session = mutableStateOf<Session?>(null)
     private var sessionCounter = 0
@@ -73,6 +76,10 @@ constructor(
 
     val isOpen: Boolean
         get() = session.value != null
+
+    /** The page showing, or null when closed. */
+    val page: Page?
+        get() = session.value?.page
 
     /** When the tray last opened (uptime), for ignoring the window's own side effects. */
     var openedAtMillis = 0L
@@ -83,18 +90,23 @@ constructor(
         notifications.init()
     }
 
-    fun open(end: End) {
+    fun open(page: Page) {
         val view = root ?: createWindow().also { root = it }
         openedAtMillis = SystemClock.uptimeMillis()
         session.value =
             Session(
-                end = end,
+                page = page,
                 id = ++sessionCounter,
                 accent = accent(),
                 redacted = notifications.isRedacted(),
             )
         quickSettings.setListening(true)
         view.visibility = View.VISIBLE
+    }
+
+    /** Side button: the notifications screen, or close it when it is already showing. */
+    fun toggleNotifications() {
+        if (page == Page.NOTIFICATIONS) close() else open(Page.NOTIFICATIONS)
     }
 
     fun close() {
@@ -124,7 +136,7 @@ constructor(
                 )
                 .apply {
                     title = "CircaShade"
-                    accessibilityTitle = "Quick settings and notifications"
+                    accessibilityTitle = "Quick settings or notifications"
                     layoutInDisplayCutoutMode =
                         WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
                     fitInsetsTypes = 0

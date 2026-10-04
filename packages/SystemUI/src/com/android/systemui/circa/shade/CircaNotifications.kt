@@ -16,6 +16,7 @@
 
 package com.android.systemui.circa.shade
 
+import android.app.ActivityManager
 import android.app.Notification
 import android.content.Context
 import android.content.pm.PackageManager
@@ -55,7 +56,7 @@ data class CircaNotification(
 )
 
 /**
- * The notification end of the tray, fed by SystemUI's own notification pipeline: the list the
+ * The notifications page of the tray, fed by SystemUI's own notification pipeline: the list the
  * phone shade would render (after SystemUI's filtering, grouping and ranking), flattened to one
  * card per notification (group summaries are dropped when the group has children).
  * Dismissal goes through [NotifCollection] and taps through [ActivityStarter], like the shade's.
@@ -165,6 +166,14 @@ constructor(
                 visibilityOf(item),
             ),
         )
+    }
+
+    /**
+     * "Clear all": the phone shade's own clear-all path (NotificationStackScrollLayoutController):
+     * system server clears every clearable notification of the user; ongoing ones stay. Main thread.
+     */
+    fun dismissAll() {
+        notifCollection.dismissAllNotifications(ActivityManager.getCurrentUser())
     }
 
     private fun visibilityOf(item: CircaNotification): NotificationVisibility {

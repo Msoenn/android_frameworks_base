@@ -30,8 +30,7 @@ import kotlin.math.abs
 
 /**
  * The stock Wear edge swipes, system-wide: a swipe down that starts in the top edge band opens
- * the tray at its quick-settings end, a swipe up that starts in the bottom edge band opens it at
- * its notifications end.
+ * the quick-settings page, a swipe up that starts in the bottom edge band the notifications page.
  *
  * A gesture monitor (the mechanism the back gesture uses) sees every touch on the display. Once a
  * vertical edge swipe passes the touch slop it pilfers the pointers, so the app below gets
@@ -49,7 +48,7 @@ class CircaEdgeSwipe(
     private val inputManager: InputManager,
     private val displayId: Int,
     /** Returns false when the swipe is not taken (e.g. the tray is already open). */
-    private val onSwipe: (CircaTray.End) -> Boolean,
+    private val onSwipe: (CircaTray.Page) -> Boolean,
 ) {
     private enum class Candidate { NONE, TOP, BOTTOM }
 
@@ -119,9 +118,9 @@ class CircaEdgeSwipe(
                 if (triggered) {
                     val end =
                         if (candidate == Candidate.TOP) {
-                            CircaTray.End.QUICK_SETTINGS
+                            CircaTray.Page.QUICK_SETTINGS
                         } else {
-                            CircaTray.End.NOTIFICATIONS
+                            CircaTray.Page.NOTIFICATIONS
                         }
                     candidate = Candidate.NONE
                     if (onSwipe(end)) monitor?.pilferPointers()

@@ -48,9 +48,12 @@ import javax.inject.Inject
  * * the phone shade can no longer be pulled down (`StatusBarManager.DISABLE_EXPAND`, the same
  *   switch lock-task mode uses), so nothing of the phone QS / notification panel shows;
  * * every request to open or close the shade (`StatusBarManager.expandNotificationsPanel()` /
- *   `expandSettingsPanel()` / `collapsePanels()`, `cmd statusbar …`) goes to [CircaTray] instead;
- * * a swipe down from the top edge opens the tray at its quick-settings end and a swipe up from
- *   the bottom edge at its notifications end ([CircaEdgeSwipe]);
+ *   `expandSettingsPanel()` / `collapsePanels()`, `cmd statusbar …`) goes to [CircaTray] instead:
+ *   settings requests show the quick-settings page, notification requests the notifications page;
+ * * `togglePanel()` (PhoneWindowManager's side-button short press, CircaKeyPolicy) toggles the
+ *   notifications page;
+ * * a swipe down from the top edge opens the quick-settings page and a swipe up from the bottom
+ *   edge the notifications page ([CircaEdgeSwipe]);
  * * a new notification peeks as a card from the bottom ([CircaHeadsUp]);
  * * the tray closes when the screen turns off, on ACTION_CLOSE_SYSTEM_DIALOGS (home, stem/crown
  *   press) and when another task comes to the front.
@@ -77,11 +80,11 @@ constructor(
     private val commandQueueCallbacks =
         object : CommandQueue.Callbacks {
             override fun animateExpandNotificationsPanel() {
-                tray.open(CircaTray.End.NOTIFICATIONS)
+                tray.open(CircaTray.Page.NOTIFICATIONS)
             }
 
             override fun animateExpandSettingsPanel(subPanel: String?) {
-                tray.open(CircaTray.End.QUICK_SETTINGS)
+                tray.open(CircaTray.Page.QUICK_SETTINGS)
             }
 
             override fun animateCollapsePanels(flags: Int, force: Boolean) {
@@ -89,11 +92,16 @@ constructor(
             }
 
             override fun toggleNotificationsPanel() {
-                if (tray.isOpen) tray.close() else tray.open(CircaTray.End.NOTIFICATIONS)
+                // The side button: quick settings showing -> switch to notifications.
+                tray.toggleNotifications()
             }
 
             override fun toggleQuickSettingsPanel() {
-                if (tray.isOpen) tray.close() else tray.open(CircaTray.End.QUICK_SETTINGS)
+                if (tray.page == CircaTray.Page.QUICK_SETTINGS) {
+                    tray.close()
+                } else {
+                    tray.open(CircaTray.Page.QUICK_SETTINGS)
+                }
             }
         }
 
@@ -140,18 +148,18 @@ constructor(
         )
         TaskStackChangeListeners.getInstance().registerTaskStackListener(taskListener)
         edgeSwipe =
-            CircaEdgeSwipe(context, inputManager, context.displayId) { end ->
+            CircaEdgeSwipe(context, inputManager, context.displayId) { page ->
                 if (tray.isOpen) {
-                    // Open tray: only a swipe up from the bottom edge closes it; a pull down from
-                    // the top edge does nothing (it must not dismiss what it just opened).
-                    if (end == CircaTray.End.NOTIFICATIONS) {
+                    // Either page open: a swipe up from the bottom edge closes it; a pull down from
+                    // the top edge goes to the page (it scrolls a list, it must not dismiss).
+                    if (page == CircaTray.Page.NOTIFICATIONS) {
                         tray.close()
                         true
                     } else {
                         false
                     }
                 } else {
-                    tray.open(end)
+                    tray.open(page)
                     true
                 }
             }.also { it.start() }
@@ -161,7 +169,7 @@ constructor(
         // Reading edgeSwipe here also keeps R8 from dropping the field as write-only, which let the
         // gesture monitor be garbage collected (its input channel closed a second after boot).
         pw.println(
-            "CircaShadeStartable: enabled=$enabled trayOpen=${tray.isOpen} " +
+            "CircaShadeStartable: enabled=$enabled trayOpen=${tray.isOpen} page=${tray.page} " +
                 "headsUp=${headsUp.isShowing} " +
                 "edgeSwipe=${edgeSwipe?.describe()}"
         )

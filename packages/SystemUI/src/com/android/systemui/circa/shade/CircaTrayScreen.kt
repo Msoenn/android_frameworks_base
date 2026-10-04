@@ -81,7 +81,12 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -115,15 +120,18 @@ private val TILE_ICON = 26.dp
  * screen top; this plain column starts it at the top, so the same picture needs 18 - 24 dp.
  */
 private val QS_SHIFT = (-6).dp
-private val QS_EXTRA_HEIGHT = 48.dp
 
 /** Top of the 3 + 3 grid; the phone pill sits right under it, inside the circle's bottom chord. */
 private val GRID_TOP = 52.dp + QS_SHIFT
 
-/** Where the first card's top sits when the tray opens at the notifications end. */
+/** Upward pull past the end of the quick-settings page that closes it (stock: swipe up = close). */
+private val QS_PULL_CLOSE = 56.dp
+
+/** Where the first card's top sits on the notifications page. */
 private val STREAM_TOP = 40.dp
-private val STREAM_BOTTOM_SPACE = 30.dp
-private val STREAM_SHORT_BOTTOM_SPACE = 120.dp
+
+/** Room under the last item ("Clear all") so it can be scrolled well inside the circle. */
+private val STREAM_BOTTOM_SPACE = 56.dp
 
 /** Fraction of the width a horizontal drag must cover to dismiss the tray / a card. */
 private const val DISMISS_FRACTION = 0.25f
@@ -132,10 +140,10 @@ private const val SETTLE_MILLIS = 180
 
 /**
  * The tray is laid out for a 200 dp wide screen whatever the system density is (the watch runs
- * `wm density 192`, i.e. 320 dp across, for phone apps), so its geometry matches stock Wear and the
+ * density 160, i.e. 384 dp across, for phone apps), so its geometry matches stock Wear and the
  * launcher prototype, which uses the same rule (apps/launcher model/Density.kt).
  */
-private const val TARGET_WIDTH_DP = 200f
+internal const val TARGET_WIDTH_DP = 200f
 
 @Composable
 internal fun CircaTrayDensity(content: @Composable () -> Unit) {
@@ -162,9 +170,9 @@ internal class CircaColors(val accent: Color) {
 }
 
 /**
- * The tray: one vertically scrolling column, quick settings at the top and the notification
- * stream below. Swiping right, BACK, or an up-swipe from the bottom edge band (CircaEdgeSwipe)
- * dismisses it; scrolling or pulling past the quick-settings top does not.
+ * One page of the tray (decisions.md "Shade split + side button", 2026-10-04): the quick-settings
+ * page (tiles and pills only) or the notifications page. Never both: the notifications are not
+ * stacked under the tiles any more.
  */
 @Composable
 internal fun CircaTrayScreen(
@@ -174,41 +182,42 @@ internal fun CircaTrayScreen(
     onClose: () -> Unit,
 ) {
     val colors = remember(session.accent) { CircaColors(session.accent) }
+    when (session.page) {
+        CircaTray.Page.QUICK_SETTINGS -> QuickSettingsPage(session, quickSettings, colors, onClose)
+        CircaTray.Page.NOTIFICATIONS -> NotificationsPage(session, notifications, colors, onClose)
+    }
+}
+
+/**
+ * What both pages share: the black round screen, a short slide/fade in (from the top for quick
+ * settings, from the bottom for notifications), swipe right closes (Wear's back gesture; BACK and
+ * the bottom-edge up-swipe close too, in CircaTray / CircaShadeStartable), the crown scrolls
+ * [listState], and the curved scroll indicator.
+ */
+@Composable
+private fun TrayPage(
+    session: CircaTray.Session,
+    listState: LazyListState,
+    colors: CircaColors,
+    focusRequester: FocusRequester,
+    onClose: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
     val close by rememberUpdatedState(onClose)
-    val density = LocalDensity.current
     val scope = rememberCoroutineScope()
-
+    val dragOffset = remember { Animatable(0f) }
+    val enter =
+        remember { Animatable(if (session.page == CircaTray.Page.QUICK_SETTINGS) -1f else 1f) }
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+        enter.animateTo(0f, tween(220))
+    }
     BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black)) {
-        val screenHeight = maxHeight
-        val screenWidthPx = with(density) { maxWidth.toPx() }
-        val panelHeight = quickSettingsHeight(quickSettings.tiles.value.size, screenHeight)
-        val startOffset =
-            if (session.end == CircaTray.End.NOTIFICATIONS) {
-                with(density) { (panelHeight - STREAM_TOP).roundToPx() }
-            } else {
-                0
-            }
-        val listState =
-            rememberLazyListState(
-                initialFirstVisibleItemIndex = 0,
-                initialFirstVisibleItemScrollOffset = startOffset,
-            )
-        val focusRequester = remember { FocusRequester() }
-        var editing by remember { mutableStateOf(false) }
-        LaunchedEffect(editing) { if (!editing) focusRequester.requestFocus() }
-        val dragOffset = remember { Animatable(0f) }
-        val enter =
-            remember { Animatable(if (session.end == CircaTray.End.QUICK_SETTINGS) -1f else 1f) }
-        LaunchedEffect(Unit) {
-            focusRequester.requestFocus()
-            enter.animateTo(0f, tween(220))
-        }
-
-        val items = notifications.items.value
-        val now = rememberClock()
-
+        val screenWidthPx = constraints.maxWidth.toFloat()
         Box(
-            Modifier.fillMaxSize()
+            modifier
+                .fillMaxSize()
                 .graphicsLayer {
                     translationY = enter.value * size.height * 0.2f
                     alpha = 1f - abs(enter.value)
@@ -239,11 +248,72 @@ internal fun CircaTrayScreen(
                 .focusRequester(focusRequester)
                 .focusable()
         ) {
+            content()
+            ScrollIndicator(listState, colors, Modifier.fillMaxSize())
+        }
+    }
+}
+
+/**
+ * The quick-settings page: the tile honeycomb, the phone pill and Edit. It scrolls only as far as
+ * the pills need; pulling up past its end (touch) closes it, the inverse of the swipe down that
+ * opened it. Pulling down at its top does nothing (on-watch feedback, 2026-10-03).
+ */
+@Composable
+private fun QuickSettingsPage(
+    session: CircaTray.Session,
+    quickSettings: CircaQuickSettings,
+    colors: CircaColors,
+    onClose: () -> Unit,
+) {
+    val close by rememberUpdatedState(onClose)
+    val density = LocalDensity.current
+    val listState = rememberLazyListState()
+    val focusRequester = remember { FocusRequester() }
+    var editing by remember { mutableStateOf(false) }
+    LaunchedEffect(editing) { if (!editing) focusRequester.requestFocus() }
+    val pullClosePx = with(density) { QS_PULL_CLOSE.toPx() }
+    val pullUpToClose =
+        remember(pullClosePx) {
+            object : NestedScrollConnection {
+                private var pulled = 0f
+
+                override fun onPostScroll(
+                    consumed: Offset,
+                    available: Offset,
+                    source: NestedScrollSource,
+                ): Offset {
+                    if (source == NestedScrollSource.UserInput && available.y < 0f) {
+                        pulled -= available.y
+                        if (pulled >= pullClosePx) {
+                            pulled = 0f
+                            close()
+                        }
+                    }
+                    return Offset.Zero
+                }
+
+                override suspend fun onPreFling(available: Velocity): Velocity {
+                    pulled = 0f
+                    return Velocity.Zero
+                }
+            }
+        }
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val screenHeight = maxHeight
+        val panelHeight = quickSettingsHeight(quickSettings.tiles.value.size, screenHeight)
+        TrayPage(
+            session,
+            listState,
+            colors,
+            focusRequester,
+            onClose = close,
+            modifier = Modifier.nestedScroll(pullUpToClose),
+        ) {
             LazyColumn(
                 state = listState,
                 contentPadding = PaddingValues(horizontal = 12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(4.dp),
                 modifier = Modifier.fillMaxSize(),
             ) {
                 item(key = "quick_settings") {
@@ -256,20 +326,51 @@ internal fun CircaTrayScreen(
                         onEdit = { editing = true },
                     )
                 }
-                if (items.isEmpty()) {
-                    item(key = "stream_empty") {
-                        Box(
-                            Modifier.fillMaxWidth().height(60.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                text = "No notifications",
-                                color = colors.onSurfaceVariant,
-                                fontSize = 14.sp,
-                            )
-                        }
-                    }
-                } else {
+            }
+        }
+        if (editing) {
+            EditTilesScreen(quickSettings, colors, screenHeight, onDone = { editing = false })
+        }
+    }
+}
+
+/**
+ * The notifications page, stock Wear's notification list: one card per notification (newest
+ * first, SystemUI's own ranking), cards shrink into the bezel at the top and bottom, the crown
+ * scrolls, a sideways swipe dismisses a card, a tap opens it, "Clear all" at the end, and
+ * "No notifications" when there is nothing. Redacted while a secure keyguard is showing.
+ */
+@Composable
+private fun NotificationsPage(
+    session: CircaTray.Session,
+    notifications: CircaNotifications,
+    colors: CircaColors,
+    onClose: () -> Unit,
+) {
+    val close by rememberUpdatedState(onClose)
+    val listState = rememberLazyListState()
+    val focusRequester = remember { FocusRequester() }
+    val items = notifications.items.value
+    val now = rememberClock()
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val screenHeight = maxHeight
+        TrayPage(session, listState, colors, focusRequester, onClose = close) {
+            if (items.isEmpty()) {
+                EmptyNotifications(colors)
+            } else {
+                LazyColumn(
+                    state = listState,
+                    contentPadding =
+                        PaddingValues(
+                            start = 12.dp,
+                            end = 12.dp,
+                            top = STREAM_TOP,
+                            bottom = STREAM_BOTTOM_SPACE,
+                        ),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    modifier = Modifier.fillMaxSize().testTag("circa_notifications"),
+                ) {
                     items(items, key = { it.key }) { item ->
                         NotificationCard(
                             item = item,
@@ -286,20 +387,71 @@ internal fun CircaTrayScreen(
                             onDismiss = { notifications.dismiss(item) },
                         )
                     }
-                }
-                item(key = "stream_bottom") {
-                    Box(
-                        Modifier.height(
-                            if (items.size <= 1) STREAM_SHORT_BOTTOM_SPACE else STREAM_BOTTOM_SPACE
-                        )
-                    )
+                    if (items.any { it.clearable }) {
+                        item(key = CLEAR_ALL_KEY) {
+                            ClearAllButton(
+                                colors,
+                                Modifier.padding(top = 6.dp)
+                                    .edgeTransform(listState, CLEAR_ALL_KEY, screenHeight),
+                            ) {
+                                notifications.dismissAll()
+                                close()
+                            }
+                        }
+                    }
                 }
             }
-            ScrollIndicator(listState, colors, Modifier.fillMaxSize())
         }
-        if (editing) {
-            EditTilesScreen(quickSettings, colors, screenHeight, onDone = { editing = false })
+    }
+}
+
+private const val CLEAR_ALL_KEY = "clear_all"
+
+/** Stock's empty notification list: a bell and "No notifications" in the middle of the circle. */
+@Composable
+private fun EmptyNotifications(colors: CircaColors) {
+    Column(
+        modifier =
+            Modifier.fillMaxSize().testTag("circa_notifications_empty").semantics(
+                mergeDescendants = true
+            ) {
+                contentDescription = "No notifications"
+            },
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Icon(
+            imageVector = CircaSymbols.Notifications,
+            contentDescription = null,
+            tint = colors.onSurfaceVariant,
+            modifier = Modifier.size(28.dp),
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(text = "No notifications", color = colors.onSurface, fontSize = 15.sp)
+    }
+}
+
+/** Stock's "Clear all" at the end of the list: a filled pill, 48 dp tall (a full touch target). */
+@Composable
+private fun ClearAllButton(colors: CircaColors, modifier: Modifier, onClick: () -> Unit) {
+    Row(
+        modifier =
+            modifier
+                .height(48.dp)
+                .clip(CircleShape)
+                .background(colors.surfaceHigh)
+                .combinedClickable(role = Role.Button, onClick = onClick)
+                .semantics(mergeDescendants = true) { contentDescription = "Clear all" }
+                .padding(horizontal = 18.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Canvas(Modifier.size(14.dp)) {
+            val w = 2.dp.toPx()
+            drawLine(colors.onSurface, Offset(0f, 0f), Offset(size.width, size.height), w, StrokeCap.Round)
+            drawLine(colors.onSurface, Offset(size.width, 0f), Offset(0f, size.height), w, StrokeCap.Round)
         }
+        Text(text = "Clear all", color = colors.onSurface, fontSize = 15.sp, fontWeight = FontWeight.Medium)
     }
 }
 
@@ -404,7 +556,7 @@ internal fun quickSettingsHeight(tileCount: Int, screenHeight: Dp): Dp {
     val content =
         gridTop(rows, screenHeight) + gridHeight(rows.size) + PILL_GAP + PILL_HEIGHT + TILE_GAP +
             PILL_HEIGHT + QS_BOTTOM_SPACE
-    return maxOf(screenHeight + QS_EXTRA_HEIGHT, content)
+    return maxOf(screenHeight, content)
 }
 
 /** A row of two may start higher: it is narrower than the circle's chord up there. */
@@ -412,11 +564,8 @@ private val GRID_TOP_NARROW = 16.dp
 
 private val PILL_HEIGHT = 24.dp
 private val PILL_GAP = 4.dp
-/**
- * Space under the Edit pill: more than [STREAM_TOP], so when the tray opens at the notifications end
- * (first card at STREAM_TOP) the pills are above the screen instead of peeking over the card.
- */
-private val QS_BOTTOM_SPACE = STREAM_TOP + 16.dp
+/** Space under the Edit pill when the page is scrolled to its end: both pills inside the circle. */
+private val QS_BOTTOM_SPACE = 28.dp
 
 /**
  * Stock's quick-settings grid (decisions.md "Quick settings A"), driven by the user's real tile
