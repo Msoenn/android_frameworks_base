@@ -28,8 +28,13 @@ import android.content.Intent;
  *       crown short press is "smart": on home it opens the app list, anywhere else it goes home.
  *   <li>{@code config_longPressOnStemPrimaryBehavior = 2} ({@link
  *       #LONG_PRESS_PRIMARY_GLOBAL_ACTIONS}): crown long press opens the power menu.
- *   <li>{@code config_circaPowerShortPressOpensRecents = true}: a short press of the side button
- *       while the screen is on and the keyguard is not showing opens Recents instead of sleeping.
+ *   <li>{@code config_shortPressOnPowerBehavior = 100} ({@link
+ *       #SHORT_PRESS_POWER_CIRCA_NOTIFICATIONS}): a short press of the side button while the screen
+ *       is on and no PIN keyguard is showing toggles SystemUI's notifications screen; with a PIN
+ *       keyguard showing it sleeps (stock {@code SHORT_PRESS_POWER_GO_TO_SLEEP}).
+ *   <li>{@code config_circaPowerShortPressOpensRecents = true} (the first design, kept for
+ *       builds without the Circa shade): the same press opens the launcher's Recents instead,
+ *       unless the short-press behaviour is the notifications one above.
  * </ul>
  *
  * <p>Both launcher-facing intents are sent explicitly to the package of the current HOME role
@@ -41,6 +46,14 @@ final class CircaKeyPolicy {
 
     /** Crown long press: show the global actions (power) menu. */
     static final int LONG_PRESS_PRIMARY_GLOBAL_ACTIONS = 2;
+
+    /**
+     * Side button short press ({@code config_shortPressOnPowerBehavior}, or the
+     * {@code Settings.Global.POWER_BUTTON_SHORT_PRESS} override): toggle the notifications screen
+     * (IStatusBarService.togglePanel, which the Circa shade routes to its notifications page).
+     * Far above AOSP's SHORT_PRESS_POWER_* values (0..9) so an upstream addition cannot collide.
+     */
+    static final int SHORT_PRESS_POWER_CIRCA_NOTIFICATIONS = 100;
 
     /**
      * Action of the intent sent to the home app to show its Recents page. Handled by an activity
@@ -88,6 +101,17 @@ final class CircaKeyPolicy {
     static boolean powerShortPressOpensRecents(boolean configEnabled, boolean interactive,
             boolean keyguardShowing) {
         return configEnabled && interactive && !keyguardShowing;
+    }
+
+    /**
+     * @return whether a side-button short press with {@link #SHORT_PRESS_POWER_CIRCA_NOTIFICATIONS}
+     *         toggles the notifications screen; otherwise (a PIN keyguard is showing) it sleeps.
+     *         Only called for a short press that began and ended with the screen on, so the press
+     *         that wakes the watch from ambient or off never gets here.
+     */
+    static boolean powerShortPressOpensNotifications(int behavior, boolean interactive,
+            boolean keyguardBlocks) {
+        return behavior == SHORT_PRESS_POWER_CIRCA_NOTIFICATIONS && interactive && !keyguardBlocks;
     }
 
     /** Builds the intent that opens the home app's app list ({@code ACTION_ALL_APPS}). */

@@ -1323,13 +1323,25 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         } else if (count > 3 && count <= getMaxMultiPressPowerCount()) {
             Slog.d(TAG, "No behavior defined for power press count " + count);
         } else if (count == 1 && shouldHandleShortPressPowerAction(interactive, eventTime)) {
-            if (CircaKeyPolicy.powerShortPressOpensRecents(mCircaPowerShortPressOpensRecents,
-                    interactive, circaKeyguardOn())) {
+            // Circa: the notifications behaviour (below) wins over the older Recents switch.
+            if (mShortPressOnPowerBehavior != CircaKeyPolicy.SHORT_PRESS_POWER_CIRCA_NOTIFICATIONS
+                    && CircaKeyPolicy.powerShortPressOpensRecents(
+                            mCircaPowerShortPressOpensRecents, interactive, circaKeyguardOn())) {
                 circaShowRecents();
                 return;
             }
             switch (mShortPressOnPowerBehavior) {
                 case SHORT_PRESS_POWER_NOTHING:
+                    break;
+                case CircaKeyPolicy.SHORT_PRESS_POWER_CIRCA_NOTIFICATIONS:
+                    // Circa: the side button toggles the notifications screen; a PIN keyguard
+                    // keeps the stock sleep (docs/watch-ui/circa/buttons.md).
+                    if (CircaKeyPolicy.powerShortPressOpensNotifications(
+                            mShortPressOnPowerBehavior, interactive, circaKeyguardOn())) {
+                        toggleNotificationPanel();
+                    } else {
+                        sleepDefaultDisplayFromPowerButton(eventTime, 0);
+                    }
                     break;
                 case SHORT_PRESS_POWER_GO_TO_SLEEP:
                     sleepDefaultDisplayFromPowerButton(eventTime, 0);

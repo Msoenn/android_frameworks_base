@@ -54,6 +54,15 @@ public class CircaKeyPolicyTests {
     }
 
     @Test
+    public void powerShortPress_opensNotificationsOnlyWithCircaBehaviorAwakeAndUnlocked() {
+        final int circa = CircaKeyPolicy.SHORT_PRESS_POWER_CIRCA_NOTIFICATIONS;
+        assertTrue(CircaKeyPolicy.powerShortPressOpensNotifications(circa, true, false));
+        assertFalse(CircaKeyPolicy.powerShortPressOpensNotifications(1, true, false));
+        assertFalse(CircaKeyPolicy.powerShortPressOpensNotifications(circa, false, false));
+        assertFalse(CircaKeyPolicy.powerShortPressOpensNotifications(circa, true, true));
+    }
+
+    @Test
     public void powerShortPress_opensRecentsOnlyWhenEnabledAwakeAndUnlocked() {
         assertTrue(CircaKeyPolicy.powerShortPressOpensRecents(true, true, false));
         assertFalse(CircaKeyPolicy.powerShortPressOpensRecents(false, true, false));
