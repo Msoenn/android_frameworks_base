@@ -43,6 +43,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -301,7 +302,6 @@ private fun QuickSettingsPage(
         }
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val screenHeight = maxHeight
-        val panelHeight = quickSettingsHeight(quickSettings.tiles.value.size, screenHeight)
         TrayPage(
             session,
             listState,
@@ -316,16 +316,14 @@ private fun QuickSettingsPage(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.fillMaxSize(),
             ) {
-                item(key = "quick_settings") {
-                    QuickSettingsPanel(
-                        quickSettings,
-                        colors,
-                        panelHeight,
-                        screenHeight,
-                        onClose = close,
-                        onEdit = { editing = true },
-                    )
-                }
+                quickSettingsItems(
+                    quickSettings,
+                    colors,
+                    listState,
+                    screenHeight,
+                    onClose = close,
+                    onEdit = { editing = true },
+                )
             }
         }
         if (editing) {
@@ -362,8 +360,8 @@ private fun NotificationsPage(
                     state = listState,
                     contentPadding =
                         PaddingValues(
-                            start = 12.dp,
-                            end = 12.dp,
+                            start = 14.dp,
+                            end = 14.dp,
                             top = STREAM_TOP,
                             bottom = STREAM_BOTTOM_SPACE,
                         ),
@@ -590,52 +588,61 @@ private fun gridTop(rows: List<List<*>>, screenHeight: Dp): Dp {
     return maxOf(centred, min)
 }
 
-/** Height of the quick-settings item: the grid, the phone pill, Edit. */
-internal fun quickSettingsHeight(tileCount: Int, screenHeight: Dp): Dp {
-    val rows = tileRows(List(tileCount) { it })
-    val content =
-        gridTop(rows, screenHeight) + gridHeight(rows.size) + PILL_GAP + PILL_HEIGHT + TILE_GAP +
-            PILL_HEIGHT + QS_BOTTOM_SPACE
-    return maxOf(screenHeight, content)
-}
-
 /** A row of two may start higher: it is narrower than the circle's chord up there. */
 private val GRID_TOP_NARROW = 16.dp
 
 private val PILL_HEIGHT = 24.dp
 private val PILL_GAP = 4.dp
-/** Space under the Edit pill when the page is scrolled to its end: both pills inside the circle. */
-private val QS_BOTTOM_SPACE = 28.dp
+
+/** Height of the pill row's touch targets (the pills themselves are drawn 24 dp tall). */
+private val TARGET = 48.dp
+
+/** Space under the pill row when the page is scrolled to its end: the pills inside the circle. */
+private val QS_BOTTOM_SPACE = 24.dp
 
 /**
  * Stock's quick-settings grid (decisions.md "Quick settings A"), driven by the user's real tile
  * list: round buttons, three per row, in the order of `sysui_qs_tiles`; then the phone pill and
- * the Edit pill. Tap toggles, long press opens the tile's settings page.
+ * the Edit button. Tap toggles, long press opens the tile's settings page. One list item per row,
+ * so rows scrolled into the bezel shrink and fade like the notification cards instead of being
+ * cut by the circle.
  */
-@Composable
-private fun QuickSettingsPanel(
+private fun LazyListScope.quickSettingsItems(
     qs: CircaQuickSettings,
     colors: CircaColors,
-    height: Dp,
+    listState: LazyListState,
     screenHeight: Dp,
     onClose: () -> Unit,
     onEdit: () -> Unit,
 ) {
-    val tiles = qs.tiles.value
-    val rows = tileRows(tiles)
-    Box(Modifier.fillMaxWidth().height(height)) {
-        Column(
-            modifier =
-                Modifier.align(Alignment.TopCenter).padding(top = gridTop(rows, screenHeight)),
-            verticalArrangement = Arrangement.spacedBy(TILE_GAP),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            for (row in rows) {
-                Row(horizontalArrangement = Arrangement.spacedBy(TILE_GAP)) {
-                    for (tile in row) TileButton(tile, qs, colors, onClose)
-                }
+    val rows = tileRows(qs.tiles.value)
+    val top = gridTop(rows, screenHeight)
+    val content = top + gridHeight(rows.size) + PILL_GAP + TARGET + QS_BOTTOM_SPACE
+    item(key = "qs_top") { Spacer(Modifier.height(top)) }
+    rows.forEachIndexed { i, row ->
+        val key = "qs_row_$i"
+        item(key = key) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(TILE_GAP),
+                modifier =
+                    Modifier.padding(top = if (i == 0) 0.dp else TILE_GAP)
+                        .edgeTransform(listState, key, screenHeight, TILE_SIZE / 2),
+            ) {
+                for (tile in row) TileButton(tile, qs, colors, onClose)
             }
-            Spacer(Modifier.height(PILL_GAP - TILE_GAP))
+        }
+    }
+    item(key = QS_PILLS_KEY) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            modifier =
+                Modifier.padding(top = PILL_GAP)
+                    .edgeTransform(listState, QS_PILLS_KEY, screenHeight, TARGET / 2),
+        ) {
+            // Balances the transparent margin of Edit's 48 dp target, so the visible pill and disc
+            // are centred as a group.
+            Spacer(Modifier.width((TARGET - EDIT_DISC) / 2))
             PhonePill(
                 connected = qs.phoneConnected.value,
                 colors = colors,
@@ -644,15 +651,16 @@ private fun QuickSettingsPanel(
                     onClose()
                 },
             )
-            SmallPill(
-                icon = CircaSymbols.Edit,
-                text = stringResource(R.string.circa_edit_tiles),
-                colors = colors,
-                onClick = onEdit,
-            )
+            EditButton(colors, onEdit)
         }
     }
+    item(key = "qs_bottom") {
+        Spacer(Modifier.height(maxOf(QS_BOTTOM_SPACE, screenHeight - content + QS_BOTTOM_SPACE)))
+    }
 }
+
+private const val QS_PILLS_KEY = "qs_pills"
+private val EDIT_DISC = 28.dp
 
 private fun CircaToggle.background(c: CircaColors): Color =
     when (this) {
@@ -885,39 +893,68 @@ private fun BrightnessButton(tile: CircaTile, colors: CircaColors, onClose: () -
 /** Stock's pill under the grid: the phone connection, read-only; a tap opens Bluetooth settings. */
 @Composable
 private fun PhonePill(connected: Boolean, colors: CircaColors, onClick: () -> Unit) {
-    SmallPill(
-        icon = if (connected) CircaSymbols.SmartphoneOutlined else CircaSymbols.SmartphoneOffOutlined,
-        text = if (connected) "Connected" else "Disconnected",
-        colors = colors,
-        dim = !connected,
-        description = if (connected) "Phone connected" else "Phone disconnected",
-        onClick = onClick,
-    )
+    val tint = if (connected) colors.onSurface else colors.outline
+    // A 48 dp tall touch target around the 24 dp pill.
+    Box(
+        modifier =
+            Modifier.height(TARGET)
+                .clip(CircleShape)
+                .combinedClickable(role = Role.Button, onClick = onClick)
+                .semantics(mergeDescendants = true) {
+                    contentDescription = if (connected) "Phone connected" else "Phone disconnected"
+                },
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(
+            modifier =
+                Modifier.height(PILL_HEIGHT)
+                    .clip(CircleShape)
+                    .background(colors.surface)
+                    .padding(horizontal = 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+        ) {
+            Icon(
+                imageVector =
+                    if (connected) CircaSymbols.SmartphoneOutlined
+                    else CircaSymbols.SmartphoneOffOutlined,
+                contentDescription = null,
+                tint = tint,
+                modifier = Modifier.size(15.dp),
+            )
+            Text(
+                text = if (connected) "Connected" else "Disconnected",
+                color = tint,
+                fontSize = 10.sp,
+                maxLines = 1,
+            )
+        }
+    }
 }
 
+/** Stock's small pencil next to the phone pill: edit the tiles. 48 dp target, 28 dp disc. */
 @Composable
-private fun SmallPill(
-    icon: ImageVector,
-    text: String,
-    colors: CircaColors,
-    dim: Boolean = false,
-    description: String = text,
-    onClick: () -> Unit,
-) {
-    val tint = if (dim) colors.outline else colors.onSurface
-    Row(
+private fun EditButton(colors: CircaColors, onClick: () -> Unit) {
+    val label = stringResource(R.string.circa_edit_tiles)
+    Box(
         modifier =
-            Modifier.height(PILL_HEIGHT)
+            Modifier.size(TARGET)
                 .clip(CircleShape)
-                .background(colors.surface)
                 .combinedClickable(role = Role.Button, onClick = onClick)
-                .padding(horizontal = 9.dp)
-                .semantics(mergeDescendants = true) { contentDescription = description },
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(5.dp),
+                .semantics(mergeDescendants = true) { contentDescription = label },
+        contentAlignment = Alignment.Center,
     ) {
-        Icon(imageVector = icon, contentDescription = null, tint = tint, modifier = Modifier.size(15.dp))
-        Text(text = text, color = tint, fontSize = 10.sp, maxLines = 1)
+        Box(
+            modifier = Modifier.size(EDIT_DISC).clip(CircleShape).background(colors.surface),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = CircaSymbols.Edit,
+                contentDescription = null,
+                tint = colors.onSurface,
+                modifier = Modifier.size(16.dp),
+            )
+        }
     }
 }
 
