@@ -19,6 +19,8 @@ package com.android.systemui.circa.keyguard
 import android.content.Context
 import android.os.Handler
 import android.util.Log
+import com.android.keyguard.KeyguardUpdateMonitor
+import com.android.keyguard.KeyguardUpdateMonitorCallback
 import com.android.systemui.CoreStartable
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
@@ -39,6 +41,10 @@ import javax.inject.Inject
  * bouncer), the same as the crown (PhoneWindowManager asks the keyguard to dismiss) and the
  * launcher's gestures. The face hides while the bouncer is up, while dozing (the launcher's ambient
  * dream owns the screen then) and as soon as the keyguard goes away.
+ *
+ * While the doze dream owns the screen (asleep and dreaming, no bouncer) the notification-shade window
+ * is collapsed by force: it sits above the dream, and whatever it holds then (the keyguard's black
+ * backdrop with a PIN, a scrim) would cover the always-on face.
  */
 @SysUISingleton
 class CircaKeyguardStartable
@@ -51,9 +57,13 @@ constructor(
     @Main private val handler: Handler,
     private val face: CircaKeyguardFace,
     private val shadeWindowController: NotificationShadeWindowController,
+    private val keyguardUpdateMonitor: KeyguardUpdateMonitor,
 ) : CoreStartable {
 
     private var enabled = false
+
+    /** Whether this class collapsed the shade window (only then does it release it). */
+    private var collapsedForDream = false
 
     private val evaluateRunnable = Runnable { evaluate() }
 
@@ -66,6 +76,15 @@ constructor(
             override fun onKeyguardGoingAwayChanged() = changed()
 
             override fun onKeyguardFadingAwayChanged() = changed()
+        }
+
+    private val updateMonitorCallback =
+        object : KeyguardUpdateMonitorCallback() {
+            override fun onDreamingStateChanged(dreaming: Boolean) = changed()
+
+            override fun onStartedWakingUp() = changed()
+
+            override fun onFinishedGoingToSleep(why: Int) = changed()
         }
 
     private val stateListener =
@@ -84,6 +103,7 @@ constructor(
         }
         keyguardStateController.addCallback(keyguardCallback)
         statusBarStateController.addCallback(stateListener)
+        keyguardUpdateMonitor.registerCallback(updateMonitorCallback)
         evaluate()
     }
 
@@ -102,14 +122,33 @@ constructor(
             !keyguardStateController.isKeyguardFadingAway &&
             !statusBarStateController.isDozing
 
+    /** The launcher's doze dream owns the screen: asleep, dreaming, and no bouncer asked for. */
+    private fun dozeDreamOwnsScreen(): Boolean =
+        keyguardUpdateMonitor.isDreaming &&
+            !keyguardUpdateMonitor.isDeviceInteractive &&
+            !keyguardStateController.isPrimaryBouncerShowing
+
     private fun evaluate() {
         if (shouldShowFace()) face.show() else face.hide()
         // The notification-shade window hosts the bouncer; its content leaves a sliver at the bottom of
-        // the round panel unpainted (wallpaper shows). Black behind it while the keyguard is up.
+        // the round panel unpainted (wallpaper shows). Black behind it while the keyguard is up and
+        // nothing occludes it, or the bouncer is up; never while an occluding window (the launcher's
+        // face, the doze dream) is what shows.
         shadeWindowController.windowRootView?.setBackgroundColor(
-            if (keyguardStateController.isShowing) android.graphics.Color.BLACK
+            if (
+                keyguardStateController.isShowing &&
+                    (!keyguardStateController.isOccluded ||
+                        keyguardStateController.isPrimaryBouncerShowing)
+            )
+                android.graphics.Color.BLACK
             else android.graphics.Color.TRANSPARENT
         )
+        val collapse = dozeDreamOwnsScreen()
+        if (collapse != collapsedForDream) {
+            collapsedForDream = collapse
+            shadeWindowController.setForceWindowCollapsed(collapse)
+            Log.i(TAG, "shade window ${if (collapse) "collapsed for" else "released after"} the doze dream")
+        }
     }
 
     override fun dump(pw: PrintWriter, args: Array<out String>) {
@@ -118,7 +157,10 @@ constructor(
                 "showing=${keyguardStateController.isShowing} " +
                 "occluded=${keyguardStateController.isOccluded} " +
                 "bouncer=${keyguardStateController.isPrimaryBouncerShowing} " +
-                "dozing=${statusBarStateController.isDozing}"
+                "dozing=${statusBarStateController.isDozing} " +
+                "dreaming=${keyguardUpdateMonitor.isDreaming} " +
+                "interactive=${keyguardUpdateMonitor.isDeviceInteractive} " +
+                "collapsedForDream=$collapsedForDream"
         )
     }
 

@@ -85,6 +85,7 @@ public class DozeParameters implements
     private final PowerManager mPowerManager;
 
     private final AlwaysOnDisplayPolicy mAlwaysOnPolicy;
+    private final Context mContext;
     private final Resources mResources;
     private final BatteryController mBatteryController;
     private final ScreenOffAnimationController mScreenOffAnimationController;
@@ -144,6 +145,7 @@ public class DozeParameters implements
             SecureSettings secureSettings,
             Optional<MinModeManager> minModeManager) {
         mResources = resources;
+        mContext = context;
         mAmbientDisplayConfiguration = ambientDisplayConfiguration;
         mAlwaysOnPolicy = alwaysOnDisplayPolicy;
         mBatteryController = batteryController;
@@ -335,6 +337,10 @@ public class DozeParameters implements
      * possible if AOD isn't even enabled or if the display needs blanking.
      */
     public boolean canControlUnlockedScreenOff() {
+        // Circa: the launcher's doze dream draws the always-on face; SystemUI never dozes, so its
+        // unlocked screen-off animation would end in showAodUi() and leave the expanded shade's
+        // scrims over the dream.
+        if (com.android.systemui.circa.keyguard.CircaKeyguard.isEnabled(mContext)) return false;
         return getAlwaysOn() && !getDisplayNeedsBlanking();
     }
 
