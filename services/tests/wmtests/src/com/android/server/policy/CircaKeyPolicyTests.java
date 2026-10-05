@@ -142,4 +142,15 @@ public class CircaKeyPolicyTests {
         assertNull(CircaKeyPolicy.buildRecentsIntent("android").getPackage());
         assertNull(CircaKeyPolicy.buildAppListIntent(null).getPackage());
     }
+
+    @Test
+    public void exerciseLongPress_onUnlessPowerChosen() {
+        assertTrue(CircaKeyPolicy.exerciseLongPressEnabled(null));
+        assertTrue(CircaKeyPolicy.exerciseLongPressEnabled("list"));
+        assertTrue(CircaKeyPolicy.exerciseLongPressEnabled("last"));
+        assertTrue(CircaKeyPolicy.exerciseLongPressEnabled("bogus"));
+        assertFalse(CircaKeyPolicy.exerciseLongPressEnabled("power"));
+        assertFalse(CircaKeyPolicy.exerciseLongPressEnabled(" Power "));
+        assertEquals("circa_exercise_long_press", CircaKeyPolicy.SETTING_EXERCISE_LONG_PRESS);
+    }
 }

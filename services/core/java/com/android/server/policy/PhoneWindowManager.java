@@ -2047,10 +2047,16 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
     /**
      * Circa: starts the system exercise app's {@link CircaKeyPolicy#ACTION_EXERCISE_LONG_PRESS}
-     * activity. False when no system app declares one (or the start failed), so the caller falls
-     * back to the power menu (docs/watch-ui/circa/buttons.md).
+     * activity. False when the user chose the power menu for this press
+     * ({@link CircaKeyPolicy#SETTING_EXERCISE_LONG_PRESS}), when no system app declares one, or
+     * when the start failed, so the caller falls back to the power menu
+     * (docs/watch-ui/circa/buttons.md).
      */
     private boolean circaStartExerciseLongPress() {
+        if (!CircaKeyPolicy.exerciseLongPressEnabled(Settings.Global.getString(
+                mContext.getContentResolver(), CircaKeyPolicy.SETTING_EXERCISE_LONG_PRESS))) {
+            return false;
+        }
         final Intent intent = CircaKeyPolicy.buildExerciseLongPressIntent();
         // Query, not resolve: with two handlers resolve returns the chooser (package "android").
         final java.util.List<ResolveInfo> handlers = mPackageManager.queryIntentActivitiesAsUser(

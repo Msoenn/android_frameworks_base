@@ -84,6 +84,16 @@ final class CircaKeyPolicy {
     static final String ACTION_EXERCISE_LONG_PRESS = "org.circa.action.EXERCISE_LONG_PRESS";
 
     /**
+     * {@code Settings.Global} key written by Circa Settings (Buttons > Side button long press):
+     * {@code "list"} (default) or {@code "last"} start the exercise app as above; {@code "power"}
+     * skips it and shows the power menu. The exercise app reads the other two values itself.
+     */
+    static final String SETTING_EXERCISE_LONG_PRESS = "circa_exercise_long_press";
+
+    /** {@link #SETTING_EXERCISE_LONG_PRESS} value that turns the exercise long press off. */
+    static final String EXERCISE_LONG_PRESS_POWER = "power";
+
+    /**
      * Power short press ({@code config_shortPressOnPowerBehavior}, or the
      * {@code Settings.Global.POWER_BUTTON_SHORT_PRESS} override): toggle the notifications screen;
      * a PIN keyguard sleeps. The power-key design before the 2026-10-04 swap. Far above AOSP's
@@ -175,6 +185,16 @@ final class CircaKeyPolicy {
     static boolean powerShortPressOpensNotifications(int behavior, boolean interactive,
             boolean keyguardBlocks) {
         return behavior == SHORT_PRESS_POWER_CIRCA_NOTIFICATIONS && interactive && !keyguardBlocks;
+    }
+
+    /**
+     * @return whether the side-button long press should go to the exercise app, given the value of
+     *         {@link #SETTING_EXERCISE_LONG_PRESS} (null when unset): everything except
+     *         {@link #EXERCISE_LONG_PRESS_POWER} does, so an unset or unknown value keeps the default.
+     */
+    static boolean exerciseLongPressEnabled(String settingValue) {
+        return settingValue == null
+                || !EXERCISE_LONG_PRESS_POWER.equalsIgnoreCase(settingValue.trim());
     }
 
     /** Builds the side-button long-press intent for the exercise app (not yet resolved). */
