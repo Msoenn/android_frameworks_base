@@ -75,7 +75,15 @@ constructor(
 ) {
     val items = mutableStateOf<List<CircaNotification>>(emptyList())
 
+    /** Package labels, per package: the fallback header name. */
     private val appNames = HashMap<String, CharSequence>()
+
+    /**
+     * Header names per notification key, with the [Notification] they were read from (a repost carries
+     * a new one): a notification may name another app through `EXTRA_SUBSTITUTE_APP_NAME` (WatchLink's
+     * phone notifications, "Messages", "Gmail"), so the name is not a property of the package.
+     */
+    private val headerNames = HashMap<String, Pair<Notification, CharSequence>>()
 
     fun init() {
         notifPipeline.addOnAfterRenderListListener { entries -> update(entries) }
@@ -99,6 +107,7 @@ constructor(
                 else -> {}
             }
         }
+        headerNames.keys.retainAll(flat.mapTo(HashSet()) { it.key })
         items.value = flat.map(::toItem)
     }
 
@@ -115,7 +124,7 @@ constructor(
         return CircaNotification(
             key = entry.key,
             packageName = sbn.packageName,
-            appName = appName(sbn.packageName, sbn.user),
+            appName = headerName(entry.key, n, sbn.packageName, sbn.user),
             title = title,
             text = text,
             postTimeMillis = sbn.postTime,
@@ -123,6 +132,19 @@ constructor(
             icon = n.smallIcon?.loadDrawable(context),
             entry = entry,
         )
+    }
+
+    /**
+     * The name the notification's header shows, as AOSP's shade does
+     * (`Notification.loadHeaderAppName`): the substitute app name when the poster may set one
+     * (NotificationManagerService strips `EXTRA_SUBSTITUTE_APP_NAME` from apps without
+     * SUBSTITUTE_NOTIFICATION_APP_NAME), else the app's label; the package label if neither resolves.
+     */
+    private fun headerName(key: String, n: Notification, pkg: String, user: UserHandle): CharSequence {
+        headerNames[key]?.let { (from, name) -> if (from === n) return name }
+        val name: CharSequence = n.loadHeaderAppName(context)?.takeIf { it.isNotEmpty() } ?: appName(pkg, user)
+        headerNames[key] = n to name
+        return name
     }
 
     private fun appName(pkg: String, user: UserHandle): CharSequence =
