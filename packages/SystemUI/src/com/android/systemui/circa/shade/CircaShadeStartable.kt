@@ -124,12 +124,27 @@ constructor(
             }
         }
 
+    /**
+     * The Battery Saver tile toggles at once on a watch: mark the phone-style "Turn on Battery
+     * Saver?" confirmation (BatterySaverUtils, shown until acknowledged) as already seen.
+     */
+    private fun acknowledgeBatterySaver() {
+        val cr = context.contentResolver
+        for (key in listOf(
+            Settings.Secure.LOW_POWER_WARNING_ACKNOWLEDGED,
+            Settings.Secure.EXTRA_LOW_POWER_WARNING_ACKNOWLEDGED,
+        )) {
+            if (Settings.Secure.getInt(cr, key, 0) == 0) Settings.Secure.putInt(cr, key, 1)
+        }
+    }
+
     override fun start() {
         enabled = isEnabled(context)
         if (!enabled) return
         Log.i(TAG, "Circa Wear shade enabled")
 
         tray.init()
+        acknowledgeBatterySaver()
         theaterMode.start()
         headsUp.start()
         try {

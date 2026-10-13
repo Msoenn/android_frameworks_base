@@ -158,8 +158,8 @@ constructor(
 }
 
 /**
- * Brightness as a tile: a tap steps through three manual levels (the launcher prototype's
- * behaviour); long press opens display settings.
+ * Brightness as a tile: a tap (or long press) opens Circa Settings straight at its brightness page,
+ * where the crown sets the level; back from there returns to the watch, not the settings list.
  */
 class CircaBrightnessTile
 @Inject
@@ -193,18 +193,17 @@ constructor(
     override fun newTileState(): State = State()
 
     override fun handleClick(expandable: Expandable?) {
-        val cr = mContext.contentResolver
-        val current = Settings.System.getInt(cr, Settings.System.SCREEN_BRIGHTNESS, LEVELS.first())
-        val next = LEVELS.firstOrNull { it > current } ?: LEVELS.first()
-        Settings.System.putInt(
-            cr,
-            Settings.System.SCREEN_BRIGHTNESS_MODE,
-            Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL,
-        )
-        Settings.System.putInt(cr, Settings.System.SCREEN_BRIGHTNESS, next)
+        mActivityStarter.postStartActivityDismissingKeyguard(brightnessPage(), 0)
     }
 
-    override fun getLongClickIntent(): Intent = Intent(Settings.ACTION_DISPLAY_SETTINGS)
+    override fun getLongClickIntent(): Intent = brightnessPage()
+
+    /** Circa Settings' crown-driven brightness page (its SettingsNav EXTRA_PAGE deep link). */
+    private fun brightnessPage(): Intent =
+        Intent(Settings.ACTION_SETTINGS)
+            .setPackage(SETTINGS_PACKAGE)
+            .putExtra(EXTRA_PAGE, PAGE_BRIGHTNESS)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
 
     override fun getTileLabel(): CharSequence = mContext.getString(R.string.circa_brightness)
 
@@ -222,9 +221,10 @@ constructor(
 
     companion object {
         const val TILE_SPEC = "circa_brightness"
-        /** The steps a tap cycles through (`Settings.System.SCREEN_BRIGHTNESS`, 0..255). */
-        val LEVELS = listOf(40, 130, 230)
         const val MAX = 255
+        private const val SETTINGS_PACKAGE = "org.circa.settings"
+        private const val EXTRA_PAGE = "org.circa.settings.extra.PAGE"
+        private const val PAGE_BRIGHTNESS = "brightness"
     }
 }
 
