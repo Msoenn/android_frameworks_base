@@ -1,0 +1,17 @@
+package {
+    default_applicable_licenses: ["frameworks_base_license"],
+}
+
+// Circa: host unit tests for the plain-Java parts of com.android.server.circa.
+// m CircaServicesHostTests && atest --host CircaServicesHostTests
+java_test_host {
+    name: "CircaServicesHostTests",
+    srcs: [
+        "src/**/*.java",
+        ":services.core-circa-usb-policy",
+    ],
+    static_libs: ["junit"],
+    test_options: {
+        unit_test: true,
+    },
+}

@@ -19,6 +19,7 @@ package com.android.server.usb;
 import static android.hardware.usb.DisplayPortAltModeInfo.DISPLAYPORT_ALT_MODE_STATUS_UNKNOWN;
 import static android.hardware.usb.DisplayPortAltModeInfo.LINK_TRAINING_STATUS_UNKNOWN;
 import static android.hardware.usb.InternalUsbDataSignalDisableReason.USB_DISABLE_REASON_APM;
+import static android.hardware.usb.InternalUsbDataSignalDisableReason.USB_DISABLE_REASON_CIRCA;
 import static android.hardware.usb.InternalUsbDataSignalDisableReason.USB_DISABLE_REASON_ENTERPRISE;
 import static android.hardware.usb.InternalUsbDataSignalDisableReason.USB_DISABLE_REASON_LOCKDOWN_MODE;
 import static android.hardware.usb.UsbOperationInternal.USB_OPERATION_ERROR_INTERNAL;
@@ -1720,7 +1721,8 @@ public class UsbService extends IUsbManager.Stub {
                 Set.of(
                         USB_DISABLE_REASON_APM,
                         USB_DISABLE_REASON_LOCKDOWN_MODE,
-                        USB_DISABLE_REASON_ENTERPRISE);
+                        USB_DISABLE_REASON_ENTERPRISE,
+                        USB_DISABLE_REASON_CIRCA);
 
         private IUsbOperationInternalProvider mUsbOperationInternalProvider =
                 new IUsbOperationInternalProvider() {

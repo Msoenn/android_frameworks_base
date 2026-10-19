@@ -3497,6 +3497,15 @@ public final class SystemServer implements Dumpable {
             mSystemServiceManager.startBootPhase(t, SystemService.PHASE_THIRD_PARTY_APPS_CAN_START);
             t.traceEnd();
 
+            // Circa: auto-reboot, Wi-Fi auto-off, USB data modes
+            t.traceBegin("CircaSystemServerExt");
+            try {
+                com.android.server.circa.CircaSystemServerExt.init(context);
+            } catch (Throwable e) {
+                reportWtf("starting CircaSystemServerExt", e);
+            }
+            t.traceEnd();
+
             if (hsumBootUserInitializer != null) {
                 t.traceBegin("HsumBootUserInitializer.systemRunning");
                 hsumBootUserInitializer.systemRunning(t);

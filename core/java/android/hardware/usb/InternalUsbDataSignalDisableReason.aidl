@@ -21,5 +21,7 @@ package android.hardware.usb;
 enum InternalUsbDataSignalDisableReason {
     USB_DISABLE_REASON_LOCKDOWN_MODE = 0,
     USB_DISABLE_REASON_APM = 1,
-    USB_DISABLE_REASON_ENTERPRISE = 2
+    USB_DISABLE_REASON_ENTERPRISE = 2,
+    // Circa: the circa_usb_data setting (com.android.server.circa.CircaUsbPortGuard)
+    USB_DISABLE_REASON_CIRCA = 3
 }
