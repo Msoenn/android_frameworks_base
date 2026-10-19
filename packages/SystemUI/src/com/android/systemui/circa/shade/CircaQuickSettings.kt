@@ -33,6 +33,7 @@ import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.dagger.qualifiers.Background
 import com.android.systemui.dagger.qualifiers.Main
+import com.android.systemui.plugins.ActivityStarter
 import com.android.systemui.plugins.qs.QSTile
 import com.android.systemui.qs.external.CustomTile
 import com.android.systemui.qs.pipeline.domain.interactor.CurrentTilesInteractor
@@ -41,6 +42,7 @@ import com.android.systemui.qs.pipeline.shared.TileSpec
 import com.android.systemui.qs.tileimpl.QSTileImpl
 import com.android.systemui.res.R
 import com.android.systemui.statusbar.policy.BatteryController
+import com.android.systemui.statusbar.policy.KeyguardStateController
 import java.util.concurrent.Executor
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
@@ -155,6 +157,8 @@ constructor(
     @Application private val scope: CoroutineScope,
     @Main private val mainExecutor: Executor,
     @Background private val bgExecutor: Executor,
+    private val activityStarter: ActivityStarter,
+    private val keyguardStateController: KeyguardStateController,
 ) {
     /** The current tiles, in the user's order. */
     val tiles = mutableStateOf<List<CircaTile>>(emptyList())
@@ -220,6 +224,31 @@ constructor(
         val kept = next.toSet()
         old.values.filter { it !in kept }.forEach { it.detach() }
         tiles.value = next
+    }
+
+    /**
+     * A tap on [tile]. Radio tiles ([UNLOCK_TO_TOGGLE]) on a secure keyguard ask for the PIN first:
+     * the tray closes (it sits above the bouncer), and the toggle runs once the keyguard is gone;
+     * nothing happens if the bouncer is cancelled. Every other tile toggles right away.
+     */
+    fun toggle(tile: CircaTile, onClose: () -> Unit) {
+        val secureLocked =
+            keyguardStateController.isShowing &&
+                keyguardStateController.isMethodSecure &&
+                !keyguardStateController.isUnlocked
+        if (!secureLocked || tile.spec !in UNLOCK_TO_TOGGLE) {
+            tile.toggle()
+            return
+        }
+        onClose()
+        activityStarter.dismissKeyguardThenExecute(
+            {
+                mainExecutor.execute { tile.toggle() }
+                false
+            },
+            /* cancel= */ null,
+            /* afterKeyguardGone= */ true,
+        )
     }
 
     /** Called with true when the tray opens and false when it closes. */
@@ -340,6 +369,9 @@ constructor(
                 CircaBrightnessTile.TILE_SPEC,
                 CircaSettingsTile.TILE_SPEC,
             )
+
+        /** Radio tiles that need the PIN before they toggle on a secure keyguard. */
+        private val UNLOCK_TO_TOGGLE = setOf("wifi", "internet", "bt", "airplane")
 
         /** Short names for tiles whose own label is long or missing outside a tile view. */
         private val KNOWN_LABELS =

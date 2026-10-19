@@ -754,7 +754,7 @@ private fun TileButton(tile: CircaTile, qs: CircaQuickSettings, colors: CircaCol
                 label = tile.label.value.toString(),
                 stateDescription = state.name.lowercase(),
                 background = state.background(colors),
-                onClick = { tile.toggle() },
+                onClick = { qs.toggle(tile, onClose) },
                 onLongClick = {
                     if (tile.longPress()) onClose()
                 },
