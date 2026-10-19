@@ -44,6 +44,7 @@ import com.android.settingslib.animation.DisappearAnimationUtils;
 import com.android.systemui.res.R;
 import com.android.systemui.statusbar.policy.DevicePostureController.DevicePostureInt;
 
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -282,7 +283,8 @@ public class KeyguardPINView extends KeyguardPinBasedInputView {
         if (scramblePin || scramblePin != mScramblePin) {
             mScramblePin = scramblePin;
             if (scramblePin) {
-                Collections.shuffle(mNumbers);
+                // Circa: unpredictable layouts (SecureRandom, as GrapheneOS does)
+                Collections.shuffle(mNumbers, new SecureRandom());
             } else {
                 mNumbers = new ArrayList<>(mDefaultNumbers);
             }
