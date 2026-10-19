@@ -34,7 +34,8 @@ import android.util.Slog;
  * <p>Based on GrapheneOS's com.android.server.ext.DelayedConditionalAction
  * (https://github.com/GrapheneOS/platform_frameworks_base, services/core/java/com/android/server/ext/
  * DelayedConditionalAction.java), with the delay read from a Settings.Global key instead of
- * GrapheneOS's ExtSettings, and a way to retry a fired action later.
+ * GrapheneOS's ExtSettings (capped at a week), a way to retry a fired action later, stale alarm
+ * deliveries dropped, and every callback guarded by {@link CircaSafe}.
  *
  * <p>The alarm is an exact ELAPSED_REALTIME_WAKEUP alarm set by system_server: AlarmManagerService
  * gives core-uid alarms FLAG_ALLOW_WHILE_IDLE_UNRESTRICTED, so it fires on time in deep Doze.
@@ -50,6 +51,8 @@ abstract class DelayedConditionalAction {
     private final long minDelayMs;
     private final AlarmManager.OnAlarmListener alarmListener;
     private boolean alarmScheduled;
+    /** Elapsed-realtime trigger time of the scheduled alarm, for dropping stale deliveries. */
+    private long alarmDeadline;
 
     protected DelayedConditionalAction(Context context, Handler handler, String settingKey,
             long defaultDelayMs, long minDelayMs) {
@@ -65,7 +68,13 @@ abstract class DelayedConditionalAction {
         }
 
         alarmManager = context.getSystemService(AlarmManager.class);
-        alarmListener = () -> {
+        alarmListener = () -> CircaSafe.run(getLogTag(), "alarm", () -> {
+            long now = SystemClock.elapsedRealtime();
+            if (!alarmScheduled || !CircaTiming.isDue(now, alarmDeadline)) {
+                // Delivered for a schedule that has since been cancelled or replaced.
+                Slog.d(getLogTag(), "stale alarm ignored");
+                return;
+            }
             alarmScheduled = false;
             Slog.d(getLogTag(), "alarm triggered");
 
@@ -75,7 +84,7 @@ abstract class DelayedConditionalAction {
             }
 
             alarmTriggered();
-        };
+        });
     }
 
     public void init() {
@@ -85,7 +94,7 @@ abstract class DelayedConditionalAction {
                 Settings.Global.getUriFor(settingKey), false, new ContentObserver(handler) {
                     @Override
                     public void onChange(boolean selfChange) {
-                        update();
+                        CircaSafe.run(getLogTag(), "setting", () -> update());
                     }
                 });
 
@@ -119,11 +128,8 @@ abstract class DelayedConditionalAction {
     }
 
     private void scheduleAlarm(long delayMillis) {
-        long current = SystemClock.elapsedRealtime();
-        if (Long.MAX_VALUE - delayMillis < current) {
-            return;
-        }
-        alarmManager.setExact(AlarmManager.ELAPSED_REALTIME_WAKEUP, current + delayMillis,
+        alarmDeadline = CircaTiming.deadline(SystemClock.elapsedRealtime(), delayMillis);
+        alarmManager.setExact(AlarmManager.ELAPSED_REALTIME_WAKEUP, alarmDeadline,
                 getClass().getName(), alarmListener, handler);
         alarmScheduled = true;
         Slog.d(getLogTag(), "scheduled alarm in " + delayMillis + " ms");

@@ -96,4 +96,35 @@ public final class CircaUsbPolicy {
                 return Action.ENABLE;
         }
     }
+
+    /**
+     * Whether the guard calls the HAL for {@code action}.
+     *
+     * @param disabledByUs Circa's disable request is in effect
+     * @param pending the last request failed or has not been confirmed yet (and on the first run)
+     * @param portEvent this evaluation was triggered by a port change: a disable is applied again
+     *     then, so "charging only" also holds for whatever was just plugged in
+     */
+    public static boolean shouldApply(Action action, boolean disabledByUs, boolean pending,
+            boolean portEvent) {
+        switch (action) {
+            case DISABLE:
+                return !disabledByUs || pending || portEvent;
+            case ENABLE:
+                return disabledByUs || pending;
+            case KEEP:
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * Whether the port status contradicts the last request, so it should be sent again.
+     *
+     * @param wantEnabled the last request allowed data
+     * @param forceDisabled a port reports DATA_STATUS_DISABLED_FORCE
+     */
+    public static boolean statusMismatch(boolean wantEnabled, boolean forceDisabled) {
+        return wantEnabled == forceDisabled;
+    }
 }

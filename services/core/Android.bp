@@ -17,10 +17,14 @@ filegroup {
     visibility: ["//frameworks/base/services"],
 }
 
-// Circa: the USB data decision table, plain Java, for the host unit test in services/tests/circa.
+// Circa: the plain-Java parts of com.android.server.circa (USB decisions, timer arithmetic), for the
+// host unit tests in services/tests/circa.
 filegroup {
     name: "services.core-circa-usb-policy",
-    srcs: ["java/com/android/server/circa/CircaUsbPolicy.java"],
+    srcs: [
+        "java/com/android/server/circa/CircaTiming.java",
+        "java/com/android/server/circa/CircaUsbPolicy.java",
+    ],
     path: "java",
     visibility: ["//frameworks/base/services/tests/circa"],
 }

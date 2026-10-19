@@ -49,24 +49,9 @@ public final class CircaSettings {
 
     private CircaSettings() {}
 
-    /**
-     * A duration setting: unset or unparsable = {@code def}, 0 or negative = 0 (off), otherwise at
-     * least {@code min}.
-     */
+    /** A duration setting, see {@link CircaTiming#parseDurationMs}. */
     static long getDurationMs(ContentResolver cr, String key, long def, long min) {
-        String raw = Settings.Global.getString(cr, key);
-        long v = def;
-        if (raw != null) {
-            try {
-                v = Long.parseLong(raw.trim());
-            } catch (NumberFormatException e) {
-                v = def;
-            }
-        }
-        if (v <= 0) {
-            return 0;
-        }
-        return Math.max(v, min);
+        return CircaTiming.parseDurationMs(Settings.Global.getString(cr, key), def, min);
     }
 
     static int getUsbMode(ContentResolver cr) {

@@ -19,8 +19,6 @@ package com.android.server.circa;
 
 import static android.net.wifi.WifiManager.WifiNetworkStateChangedListener.WIFI_ROLE_CLIENT_PRIMARY;
 
-import static java.util.Objects.requireNonNull;
-
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -28,7 +26,6 @@ import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.net.wifi.WifiManager;
 import android.net.wifi.WifiManager.WifiNetworkStateChangedListener;
-import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerExecutor;
 import android.os.PowerManager;
@@ -40,8 +37,9 @@ import android.util.Slog;
  * <p>Based on GrapheneOS's com.android.server.ext.WifiAutoOff
  * (https://github.com/GrapheneOS/platform_frameworks_base, services/core/java/com/android/server/ext/
  * WifiAutoOff.java). Circa changes: the delay comes from a Settings.Global key with a 15 min
- * default, and while the screen is on the action waits a minute and checks again, so Wi-Fi never
- * goes away under someone who is picking a network or typing its password.
+ * default; while the screen is on the action waits a minute and checks again, so Wi-Fi never
+ * goes away under someone who is picking a network or typing its password; and the connection
+ * state is read again from Wi-Fi right before turning it off.
  */
 final class CircaWifiAutoOff extends DelayedConditionalAction
         implements WifiNetworkStateChangedListener {
@@ -77,6 +75,13 @@ final class CircaWifiAutoOff extends DelayedConditionalAction
     @Override
     protected void alarmTriggered() {
         if (!isEligibleForAutoOff()) {
+            return;
+        }
+        // The listener's view can lag (e.g. it registered while a connection came up at boot):
+        // ask Wi-Fi itself before turning anything off.
+        if (wifiManager.getCurrentNetwork() != null) {
+            Slog.i(TAG, "Wi-Fi is connected after all, not turning it off");
+            currentWifiNetworkState = WifiNetworkStateChangedListener.WIFI_NETWORK_STATUS_CONNECTED;
             return;
         }
         if (powerManager.isInteractive()) {
@@ -117,6 +122,10 @@ final class CircaWifiAutoOff extends DelayedConditionalAction
     /** @see WifiNetworkStateChangedListener */
     @Override
     public void onWifiNetworkStateChanged(int cmmRole, int state) {
+        CircaSafe.run(TAG, "network state", () -> onNetworkState(cmmRole, state));
+    }
+
+    private void onNetworkState(int cmmRole, int state) {
         Slog.d(TAG, "onWifiNetworkStateChanged: cmmRole " + cmmRole
                 + ", state " + wifiNetworkStateToString(state));
         if (cmmRole != WIFI_ROLE_CLIENT_PRIMARY) {
@@ -140,12 +149,13 @@ final class CircaWifiAutoOff extends DelayedConditionalAction
         var receiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
-                Bundle extras = requireNonNull(intent.getExtras());
-                currentWifiState = extras.getInt(WifiManager.EXTRA_WIFI_STATE,
-                        WifiManager.WIFI_STATE_UNKNOWN);
-                Slog.d(TAG, "WIFI_STATE_CHANGED: " + wifiStateToString(currentWifiState));
+                CircaSafe.run(TAG, "Wi-Fi state", () -> {
+                    currentWifiState = intent.getIntExtra(WifiManager.EXTRA_WIFI_STATE,
+                            WifiManager.WIFI_STATE_UNKNOWN);
+                    Slog.d(TAG, "WIFI_STATE_CHANGED: " + wifiStateToString(currentWifiState));
 
-                update();
+                    update();
+                });
             }
         };
         context.registerReceiver(receiver, filter, null, handler);

@@ -23,8 +23,12 @@ import static com.android.server.circa.CircaUsbPolicy.MODE_CHARGING_ONLY;
 import static com.android.server.circa.CircaUsbPolicy.MODE_CHARGING_ONLY_WHEN_LOCKED;
 import static com.android.server.circa.CircaUsbPolicy.MODE_ON;
 import static com.android.server.circa.CircaUsbPolicy.decide;
+import static com.android.server.circa.CircaUsbPolicy.shouldApply;
+import static com.android.server.circa.CircaUsbPolicy.statusMismatch;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -94,5 +98,40 @@ public class CircaUsbPolicyTest {
     @Test
     public void whenLocked_lockingWithoutACableDisables() {
         assertEquals(DISABLE, decide(WHEN_LOCKED, true, true, false, false));
+    }
+
+    @Test
+    public void apply_firstRunAlwaysSendsTheRequest() {
+        assertTrue(shouldApply(ENABLE, false, true, false));
+        assertTrue(shouldApply(DISABLE, true, true, false));
+    }
+
+    @Test
+    public void apply_unchangedConfirmedStateSendsNothing() {
+        assertFalse(shouldApply(ENABLE, false, false, false));
+        assertFalse(shouldApply(DISABLE, true, false, false));
+        assertFalse(shouldApply(KEEP, false, true, true));
+    }
+
+    /** "Charging only" is applied again for whatever was just plugged in. */
+    @Test
+    public void apply_disableIsResentOnEveryPortChange() {
+        assertTrue(shouldApply(DISABLE, true, false, true));
+        assertFalse(shouldApply(ENABLE, false, false, true));
+    }
+
+    /** A failed enable leaves the request pending, so the next evaluation sends it again. */
+    @Test
+    public void apply_failedEnableIsRetried() {
+        assertTrue(shouldApply(ENABLE, false, true, false));
+        assertTrue(shouldApply(ENABLE, false, true, true));
+    }
+
+    @Test
+    public void statusMismatch_comparesTheRequestWithDisabledForce() {
+        assertTrue(statusMismatch(true, true));    // want data, port still force-disabled
+        assertFalse(statusMismatch(true, false));
+        assertTrue(statusMismatch(false, false));  // want charging only, port not force-disabled
+        assertFalse(statusMismatch(false, true));
     }
 }
