@@ -178,13 +178,21 @@ public abstract class KeyguardPinBasedInputView extends KeyguardAbsKeyInputView 
         // Set selected property on so the view can send accessibility events.
         mPasswordEntry.setSelected(true);
         if (com.android.systemui.circa.keyguard.CircaKeyguard.isEnabled(mContext)) {
-            // Circa: dots on the black bouncer, no outlined entry bar (stock Wear).
+            // Circa: dots on the black bouncer, no outlined entry bar (stock Wear). The default focus
+            // highlight would draw a grey bar over the entry whenever it has focus outside touch mode.
             mPasswordEntry.setBackground(null);
+            mPasswordEntry.setDefaultFocusHighlightEnabled(false);
             // No caption: dots (placeholders when the PIN length is known) and the pad are all there is.
             View caption = findViewById(R.id.bouncer_message_view);
             if (caption != null) caption.setVisibility(View.GONE);
+            // disable() keeps the message area GONE: a plain setVisibility(GONE) is undone by the next
+            // message (dismiss-with-action prompt, wrong PIN), whose INVISIBLE area takes the pad's height.
             View captionArea = findViewById(R.id.bouncer_message_area);
-            if (captionArea != null) captionArea.setVisibility(View.GONE);
+            if (captionArea instanceof KeyguardMessageArea) {
+                ((KeyguardMessageArea) captionArea).disable();
+            } else if (captionArea != null) {
+                captionArea.setVisibility(View.GONE);
+            }
         }
         if (!pinInputFieldStyledFocusState()) {
             mPasswordEntry.setDefaultFocusHighlightEnabled(false);

@@ -20,10 +20,12 @@
          turns it on. For testing, `settings put global circa_keyguard 1` and a SystemUI restart. -->
     <bool name="config_circaKeyguard">false</bool>
 
-    <!-- Circa PIN pad palette (stock Wear OS, measured from its lock screen). -->
-    <dimen name="circa_pin_digit_size">44dp</dimen>
-    <!-- Stock Wear keys are 90 x 76 px at 384 px; the flow lays out 83 x 70, scaled up by this. -->
-    <item name="circa_pin_key_scale" format="float" type="dimen">1.085</item>
+    <!-- Circa PIN pad palette (stock Wear OS, measured from its lock screen). Sizes are for density 192
+         (1dp = 1.2px on the 384 px panel): 36.7dp digits are 44 px. -->
+    <dimen name="circa_pin_digit_size">36.7dp</dimen>
+    <!-- Stock Wear keys are 90 x 76 px at 384 px; the flow lays out ~81 x 65 (height-bound), drawn
+         scaled up by this to ~88 x 71 with a 4 px row gap. -->
+    <item name="circa_pin_key_scale" format="float" type="dimen">1.09</item>
     <color name="circa_pin_key">#ffcdd4eb</color>
     <color name="circa_pin_key_pressed">#fffcfcff</color>
     <color name="circa_pin_on_key">#ff383f51</color>

@@ -299,6 +299,19 @@ public class NumPadKey extends ViewGroup implements NumPadAnimationListener {
         super.setScaleY(scaleY * mCircaScale);
     }
 
+    // Callers see the scale they set: an animation that reads the scale back and writes it again (the
+    // appear animation) would otherwise compound the factor (1.085 drawn as 1.177 until a wrong-PIN
+    // animation set it back to 1.085).
+    @Override
+    public float getScaleX() {
+        return super.getScaleX() / mCircaScale;
+    }
+
+    @Override
+    public float getScaleY() {
+        return super.getScaleY() / mCircaScale;
+    }
+
     private void applyCircaScale() {
         mCircaScale = getResources().getFloat(R.dimen.circa_pin_key_scale);
         setScaleX(1f);

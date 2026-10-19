@@ -142,7 +142,8 @@ public class PinShapeHintingView extends LinearLayout implements PinShapeInput {
             dot.setShape(android.graphics.drawable.GradientDrawable.OVAL);
             dot.setColor(getPinHintDotColor());
             dot.setSize(mDotDiameter, mDotDiameter);
-            int inset = Math.max(0, (mDotDiameter - dpToPx(12)) / 2);
+            // 10dp: a 12 px dot at density 192.
+            int inset = Math.max(0, (mDotDiameter - dpToPx(10)) / 2);
             pinDot.setImageDrawable(new android.graphics.drawable.InsetDrawable(dot, inset));
             return;
         }
