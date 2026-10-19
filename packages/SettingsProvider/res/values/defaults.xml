@@ -163,6 +163,14 @@
     <!-- Default for Settings.Global.WIFI_SCAN_ALWAYS_AVAILABLE -->
     <integer name="def_wifi_scan_always_available">0</integer>
 
+    <!-- Circa: defaults for keys AOSP does not seed, overlaid by the device (empty = not written,
+         which keeps the AOSP behaviour). Settings.Global.CAPTIVE_PORTAL_MODE (0 ignore, 1 prompt,
+         2 avoid), BLE_SCAN_ALWAYS_AVAILABLE (0/1) and the Wi-Fi module's
+         non_persistent_mac_randomization_force_enabled (0/1). -->
+    <string name="def_captive_portal_mode" translatable="false"></string>
+    <string name="def_ble_scan_always_available" translatable="false"></string>
+    <string name="def_non_persistent_mac_randomization_force_enabled" translatable="false"></string>
+
     <!-- Default for Settings.Secure.LOCK_SCREEN_SHOW_NOTIFICATIONS, 1==on -->
     <integer name="def_lock_screen_show_notifications">1</integer>
 

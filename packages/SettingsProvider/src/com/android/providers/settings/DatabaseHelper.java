@@ -2452,6 +2452,14 @@ class DatabaseHelper extends SQLiteOpenHelper {
             loadIntegerSetting(stmt, Settings.Global.WIFI_SCAN_ALWAYS_AVAILABLE,
                     R.integer.def_wifi_scan_always_available);
 
+            // Circa: device defaults for keys AOSP leaves unset (written only when overlaid).
+            loadCircaOptionalSetting(stmt, Settings.Global.CAPTIVE_PORTAL_MODE,
+                    R.string.def_captive_portal_mode);
+            loadCircaOptionalSetting(stmt, Settings.Global.BLE_SCAN_ALWAYS_AVAILABLE,
+                    R.string.def_ble_scan_always_available);
+            loadCircaOptionalSetting(stmt, "non_persistent_mac_randomization_force_enabled",
+                    R.string.def_non_persistent_mac_randomization_force_enabled);
+
             loadIntegerSetting(stmt, Global.HEADS_UP_NOTIFICATIONS_ENABLED,
                     R.integer.def_heads_up_enabled);
 
@@ -2487,6 +2495,14 @@ class DatabaseHelper extends SQLiteOpenHelper {
         stmt.bindString(1, key);
         stmt.bindString(2, value.toString());
         stmt.execute();
+    }
+
+    /** Circa: inserts the string resource's value unless it is empty. */
+    private void loadCircaOptionalSetting(SQLiteStatement stmt, String key, int resid) {
+        String value = mContext.getResources().getString(resid);
+        if (!TextUtils.isEmpty(value)) {
+            loadSetting(stmt, key, value);
+        }
     }
 
     private void loadStringSetting(SQLiteStatement stmt, String key, int resid) {
