@@ -51,6 +51,11 @@ interface CircaShadeModule {
 
     @Binds
     @IntoMap
+    @StringKey(CircaBedtimeTile.TILE_SPEC)
+    fun bindCircaBedtimeTile(tile: CircaBedtimeTile): QSTileImpl<*>
+
+    @Binds
+    @IntoMap
     @StringKey(CircaBrightnessTile.TILE_SPEC)
     fun bindCircaBrightnessTile(tile: CircaBrightnessTile): QSTileImpl<*>
 

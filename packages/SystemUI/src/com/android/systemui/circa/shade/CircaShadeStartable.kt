@@ -70,6 +70,7 @@ constructor(
     @Main private val mainExecutor: Executor,
     private val tray: CircaTray,
     private val theaterMode: CircaTheaterMode,
+    private val bedtimeMode: CircaBedtimeMode,
     private val headsUp: CircaHeadsUp,
 ) : CoreStartable {
 
@@ -146,6 +147,7 @@ constructor(
         tray.init()
         acknowledgeBatterySaver()
         theaterMode.start()
+        bedtimeMode.start()
         headsUp.start()
         try {
             barService.disable(StatusBarManager.DISABLE_EXPAND, disableToken, context.packageName)

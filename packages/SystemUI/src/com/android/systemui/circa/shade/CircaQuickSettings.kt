@@ -366,6 +366,7 @@ constructor(
         val CIRCA_TILES =
             listOf(
                 CircaTheaterTile.TILE_SPEC,
+                CircaBedtimeTile.TILE_SPEC,
                 CircaBrightnessTile.TILE_SPEC,
                 CircaSettingsTile.TILE_SPEC,
             )
@@ -391,6 +392,7 @@ constructor(
                 "dark" to "Dark theme",
                 "screenrecord" to "Screen record",
                 "theater" to "Theater mode",
+                "circa_bedtime" to "Bedtime",
                 "circa_brightness" to "Brightness",
                 "circa_settings" to "Settings",
             )

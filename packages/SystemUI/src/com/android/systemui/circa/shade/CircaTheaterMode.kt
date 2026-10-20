@@ -40,12 +40,13 @@ import javax.inject.Inject
  * What this adds while the setting is on (and undoes when it goes off; follows the setting
  * however it is changed - the tile, `settings put global theater_mode_on 1`, another app):
  * * the screen goes off right away (as on stock);
- * * AOD and every doze wake source off: `doze_always_on`, `doze_enabled`, pick-up / tap /
- *   double-tap pulses, `wake_gesture_enabled` (tilt-to-wake), `double_tap_to_wake`;
- * * notifications silent and without vibration: ringer mode SILENT;
- * the previous values are kept in Settings.Secure [SAVED_SETTING] so a SystemUI restart in theater
- * mode still restores them. The power button still wakes the screen (temporarily: the doze
- * settings stay off, so it goes dark again on timeout).
+ * * AOD and every doze wake source off ([CircaModeOverrides.QUIET]: `doze_always_on`,
+ *   `doze_enabled`, pick-up / tap / double-tap pulses, `wake_gesture_enabled`,
+ *   `double_tap_to_wake`), shared with Bedtime through [CircaModeOverrides] so the two can overlap;
+ * * notifications silent and without vibration: ringer mode SILENT, the previous mode kept in
+ *   Settings.Secure [SAVED_RINGER].
+ * The power button still wakes the screen (temporarily: the doze settings stay off, so it goes
+ * dark again on timeout).
  *
  * Not covered here (other layers): the crown press / crown rotation wake in PhoneWindowManager and
  * the launcher's own tilt-to-wake must check THEATER_MODE_ON themselves.
@@ -56,6 +57,7 @@ class CircaTheaterMode
 constructor(
     @Application private val context: Context,
     @Main private val mainHandler: Handler,
+    private val overrides: CircaModeOverrides,
 ) {
     private val observer =
         object : ContentObserver(mainHandler) {
@@ -70,66 +72,46 @@ constructor(
             false,
             observer,
         )
+        // An update in theater mode: the old store held the ringer too (isActive loads the book,
+        // which imports the old store).
+        overrides.isActive(MODE)
+        overrides.legacyTheaterRinger?.let {
+            if (Settings.Secure.getString(context.contentResolver, SAVED_RINGER) == null) {
+                Settings.Secure.putInt(context.contentResolver, SAVED_RINGER, it)
+            }
+        }
         sync()
     }
 
     private fun sync() {
         val on = isOn(context)
-        val saved = Settings.Secure.getString(context.contentResolver, SAVED_SETTING)
-        if (on && saved == null) enter() else if (!on && saved != null) exit(saved)
+        val active = overrides.isActive(MODE)
+        if (on && !active) enter() else if (!on && active) exit()
     }
 
     private fun enter() {
         val cr = context.contentResolver
         val audio = context.getSystemService(AudioManager::class.java)
-        val saved = StringBuilder()
-        for (key in SECURE_KEYS) {
-            val v = Settings.Secure.getString(cr, key)
-            saved.append(key).append('=').append(v ?: NULL).append(';')
-            Settings.Secure.putInt(cr, key, 0)
-        }
-        saved.append(RINGER).append('=').append(audio?.ringerModeInternal ?: -1)
-        Settings.Secure.putString(cr, SAVED_SETTING, saved.toString())
+        overrides.set(MODE, CircaModeOverrides.QUIET)
+        Settings.Secure.putInt(cr, SAVED_RINGER, audio?.ringerModeInternal ?: -1)
         audio?.ringerModeInternal = AudioManager.RINGER_MODE_SILENT
         context.getSystemService(PowerManager::class.java)?.goToSleep(SystemClock.uptimeMillis())
         Log.i(TAG, "Theater mode on")
     }
 
-    private fun exit(saved: String) {
+    private fun exit() {
         val cr = context.contentResolver
-        for (entry in saved.split(';')) {
-            val i = entry.indexOf('=')
-            if (i <= 0) continue
-            val key = entry.substring(0, i)
-            val value = entry.substring(i + 1)
-            if (key == RINGER) {
-                val mode = value.toIntOrNull() ?: continue
-                if (mode >= 0) {
-                    context.getSystemService(AudioManager::class.java)?.ringerModeInternal = mode
-                }
-            } else if (key in SECURE_KEYS) {
-                Settings.Secure.putString(cr, key, if (value == NULL) null else value)
-            }
-        }
-        Settings.Secure.putString(cr, SAVED_SETTING, null)
+        overrides.set(MODE, null)
+        val mode = Settings.Secure.getInt(cr, SAVED_RINGER, -1)
+        if (mode >= 0) context.getSystemService(AudioManager::class.java)?.ringerModeInternal = mode
+        Settings.Secure.putString(cr, SAVED_RINGER, null)
         Log.i(TAG, "Theater mode off")
     }
 
     companion object {
         private const val TAG = "CircaShade"
-        private const val SAVED_SETTING = "circa_theater_saved"
-        private const val RINGER = "ringer"
-        private const val NULL = "null"
-        private val SECURE_KEYS =
-            listOf(
-                Settings.Secure.DOZE_ALWAYS_ON,
-                Settings.Secure.DOZE_ENABLED,
-                Settings.Secure.DOZE_PICK_UP_GESTURE,
-                Settings.Secure.DOZE_TAP_SCREEN_GESTURE,
-                Settings.Secure.DOZE_DOUBLE_TAP_GESTURE,
-                Settings.Secure.WAKE_GESTURE_ENABLED,
-                Settings.Secure.DOUBLE_TAP_TO_WAKE,
-            )
+        const val MODE = "theater"
+        private const val SAVED_RINGER = "circa_theater_ringer"
 
         fun isOn(context: Context): Boolean =
             Settings.Global.getInt(context.contentResolver, Settings.Global.THEATER_MODE_ON, 0) != 0

@@ -42,7 +42,7 @@ import javax.inject.Inject
 /*
  * Circa's own quick-settings tiles. They are ordinary SystemUI tiles (QSTileImpl, bound into the
  * tile map in CircaShadeModule), so they live in `sysui_qs_tiles` next to the platform ones and
- * work in the phone panel too. All three are only available while the Circa shade is enabled.
+ * work in the phone panel too. All of them are only available while the Circa shade is enabled.
  */
 
 /** Base for the Circa tiles: the Circa flag gates availability; settings observed while listening. */
@@ -158,6 +158,66 @@ constructor(
 }
 
 /**
+ * Bedtime (stock Pixel Watch): `Settings.Global bedtime_mode`, applied by [CircaBedtimeMode]. A tap
+ * toggles it; a long press opens Circa Settings' Bedtime page (schedule, start when asleep).
+ */
+class CircaBedtimeTile
+@Inject
+constructor(
+    host: QSHost,
+    uiEventLogger: QsEventLogger,
+    @Background backgroundLooper: Looper,
+    @Main mainHandler: Handler,
+    falsingManager: FalsingManager,
+    metricsLogger: MetricsLogger,
+    statusBarStateController: StatusBarStateController,
+    activityStarter: ActivityStarter,
+    qsLogger: QSLogger,
+    private val bedtime: CircaBedtimeMode,
+) :
+    CircaSettingTile<BooleanState>(
+        host,
+        uiEventLogger,
+        backgroundLooper,
+        mainHandler,
+        falsingManager,
+        metricsLogger,
+        statusBarStateController,
+        activityStarter,
+        qsLogger,
+        listOf(Settings.Global.getUriFor(CircaBedtimeMode.KEY_STATE)),
+    ) {
+
+    override fun newTileState(): BooleanState = BooleanState()
+
+    override fun handleClick(expandable: Expandable?) {
+        bedtime.set(!bedtime.isOn(), CircaBedtimeMode.SOURCE_MANUAL)
+    }
+
+    override fun getLongClickIntent(): Intent =
+        Intent(Settings.ACTION_SETTINGS)
+            .setPackage(CircaBrightnessTile.SETTINGS_PACKAGE)
+            .putExtra(CircaBrightnessTile.EXTRA_PAGE, PAGE_BEDTIME)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+
+    override fun getTileLabel(): CharSequence = mContext.getString(R.string.circa_bedtime)
+
+    override fun handleUpdateState(state: BooleanState, arg: Any?) {
+        val on = CircaBedtimeMode.isOn(mContext)
+        state.value = on
+        state.state = if (on) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
+        state.label = mContext.getString(R.string.circa_bedtime)
+        state.icon = maybeLoadResourceIcon(R.drawable.circa_ic_bedtime)
+        state.handlesLongClick = true
+    }
+
+    companion object {
+        const val TILE_SPEC = "circa_bedtime"
+        private const val PAGE_BEDTIME = "bedtime"
+    }
+}
+
+/**
  * Brightness as a tile: a tap (or long press) opens Circa Settings straight at its brightness page,
  * where the crown sets the level; back from there returns to the watch, not the settings list.
  */
@@ -222,8 +282,8 @@ constructor(
     companion object {
         const val TILE_SPEC = "circa_brightness"
         const val MAX = 255
-        private const val SETTINGS_PACKAGE = "org.circa.settings"
-        private const val EXTRA_PAGE = "org.circa.settings.extra.PAGE"
+        const val SETTINGS_PACKAGE = "org.circa.settings"
+        const val EXTRA_PAGE = "org.circa.settings.extra.PAGE"
         private const val PAGE_BRIGHTNESS = "brightness"
     }
 }

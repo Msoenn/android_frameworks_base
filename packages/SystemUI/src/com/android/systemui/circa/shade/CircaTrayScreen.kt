@@ -705,6 +705,7 @@ private fun symbolFor(spec: String): ImageVector? =
         "dnd",
         "modes_dnd" -> CircaSymbols.DoNotDisturb
         "theater" -> CircaSymbols.Theaters
+        "circa_bedtime" -> CircaSymbols.Bedtime
         "bt" -> CircaSymbols.Bluetooth
         "wifi",
         "internet" -> CircaSymbols.Wifi
