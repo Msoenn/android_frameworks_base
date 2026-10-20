@@ -109,8 +109,14 @@ constructor(
         min: LinearBrightness,
         max: LinearBrightness,
     ): GammaBrightness {
+        // Circa: the three flows update separately, so while a brightness cap comes or goes (Wear
+        // Bedtime's BrightnessWearBedtimeModeModifier lowers BrightnessInfo.brightnessMaximum) the
+        // brightness can lie outside [min, max] for one emission; out of range, the conversion
+        // returns a gamma value GammaBrightness rejects, which crashed SystemUI.
+        val value = floatValue.coerceAtMost(max.floatValue).coerceAtLeast(min.floatValue)
         return GammaBrightness(
-            BrightnessUtils.convertLinearToGammaFloat(floatValue, min.floatValue, max.floatValue)
+            BrightnessUtils.convertLinearToGammaFloat(value, min.floatValue, max.floatValue)
+                .coerceIn(BrightnessUtils.GAMMA_SPACE_MIN, BrightnessUtils.GAMMA_SPACE_MAX)
         )
     }
 
