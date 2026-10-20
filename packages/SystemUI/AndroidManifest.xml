@@ -777,6 +777,16 @@
             </intent-filter>
         </activity>
 
+        <!-- Circa: the notification reply screen (canned replies + keyboard). Not exported, never
+             over the keyguard: CircaNotifications.openReply starts it through the keyguard dismissal. -->
+        <activity android:name=".circa.shade.CircaReplyActivity"
+            android:theme="@android:style/Theme.Material.NoActionBar"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity="com.android.systemui.circa.reply"
+            android:windowSoftInputMode="adjustResize"
+            android:exported="false" />
+
         <!-- People Space UI Screen -->
         <activity android:name=".people.PeopleSpaceActivity"
             android:label="@string/people_tile_title"

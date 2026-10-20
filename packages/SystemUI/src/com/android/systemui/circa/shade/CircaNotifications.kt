@@ -17,8 +17,13 @@
 package com.android.systemui.circa.shade
 
 import android.app.ActivityManager
+import android.app.ActivityOptions
 import android.app.Notification
+import android.app.PendingIntent
+import android.app.RemoteInput
 import android.content.Context
+import android.content.Intent
+import android.os.Bundle
 import android.content.pm.PackageManager
 import android.graphics.drawable.Drawable
 import android.os.RemoteException
@@ -53,7 +58,33 @@ data class CircaNotification(
     val clearable: Boolean,
     val icon: Drawable?,
     val entry: NotificationEntry,
+    /** The buttons the card draws, at most [MAX_ACTIONS] (see [CircaNotifications.actionsOf]). */
+    val actions: List<CircaAction> = emptyList(),
+    /** `CATEGORY_CALL`: its actions (Accept / Reject) work on a secure keyguard without unlocking. */
+    val isCall: Boolean = false,
 )
+
+/**
+ * One notification action as a card button. [index] is its position in the list it came from
+ * (the WearableExtender's actions when the app set any, else `Notification.actions`), which is
+ * what [CircaNotifications.sendReply] looks it up by again.
+ */
+data class CircaAction(
+    val index: Int,
+    val title: CharSequence,
+    val intent: PendingIntent,
+    val action: Notification.Action,
+) {
+    /** The RemoteInputs the reply screen fills: free-form text or a list of choices. */
+    val replyInputs: List<RemoteInput> =
+        action.remoteInputs.orEmpty().filter { it.allowFreeFormInput || !it.choices.isNullOrEmpty() }
+
+    val isReply: Boolean
+        get() = replyInputs.isNotEmpty()
+}
+
+/** Wear shows at most three action buttons per card (decision 2026-10-19: no "More"). */
+const val MAX_ACTIONS = 3
 
 /**
  * The notifications page of the tray, fed by SystemUI's own notification pipeline: the list the
@@ -131,7 +162,123 @@ constructor(
             clearable = entry.isClearable,
             icon = n.smallIcon?.loadDrawable(context),
             entry = entry,
+            actions = actionsOf(n).take(MAX_ACTIONS),
+            isCall = n.category == Notification.CATEGORY_CALL,
         )
+    }
+
+    /**
+     * The actions the card offers, by Wear's rule: the WearableExtender's actions when the app set
+     * any (they are meant for a watch), else the notification's own. Contextual (assistant)
+     * actions and actions without an intent or title are skipped; [CircaAction.index] stays the
+     * position in the source list.
+     */
+    internal fun actionsOf(n: Notification): List<CircaAction> {
+        val wear = Notification.WearableExtender(n).actions
+        val source: List<Notification.Action> =
+            if (wear.isNotEmpty()) wear else n.actions?.toList().orEmpty()
+        val out = ArrayList<CircaAction>()
+        source.forEachIndexed { i, a ->
+            val intent = a.actionIntent ?: return@forEachIndexed
+            if (a.isContextual || a.title.isNullOrBlank()) return@forEachIndexed
+            out.add(CircaAction(i, a.title, intent, a))
+        }
+        return out
+    }
+
+    /** The current card for [key], or null once the notification is gone. */
+    fun find(key: String): CircaNotification? = notifCollection.getEntry(key)?.let(::toItem)
+
+    /**
+     * An action button: report the click, then fire the action. On a secure keyguard only a
+     * call's actions are shown (and sent without unlocking, decision 2026-10-19); any other
+     * action goes through the keyguard dismissal like a card tap. Unlocked, an action that does
+     * not open an activity is sent in place, so the tray stays open and shows the card's update.
+     * Returns true when the caller should close the tray (an activity or the bouncer comes up).
+     * A reply action does not come here: it opens [CircaReplyActivity] ([openReply]).
+     */
+    fun invokeAction(item: CircaNotification, action: CircaAction): Boolean {
+        reportActionClick(item, action)
+        val locked = isRedacted()
+        if ((locked && item.isCall) || (!locked && !action.intent.isActivity)) {
+            sendInPlace(action.intent, null)
+            return action.intent.isActivity
+        }
+        activityStarter.startPendingIntentDismissingKeyguard(action.intent)
+        return true
+    }
+
+    /** The reply screen for [action], behind the keyguard dismissal (it never shows over a lock). */
+    fun openReply(item: CircaNotification, action: CircaAction) {
+        val intent =
+            Intent(context, CircaReplyActivity::class.java)
+                .putExtra(CircaReplyActivity.EXTRA_KEY, item.key)
+                .putExtra(CircaReplyActivity.EXTRA_INDEX, action.index)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+        activityStarter.startActivity(intent, /* dismissShade= */ true)
+    }
+
+    /**
+     * Sends [text] through the reply action at [index] of notification [key], as SystemUI's inline
+     * reply does (RemoteInputViewController): the results go into a fill-in intent for the
+     * action's PendingIntent. False when the notification or its action is gone. Main thread.
+     */
+    fun sendReply(key: String, index: Int, title: CharSequence?, text: CharSequence, fromChoice: Boolean): Boolean {
+        val item = find(key) ?: return false
+        val action =
+            actionsOf(item.entry.sbn.notification).firstOrNull {
+                it.index == index && it.isReply && (title == null || it.title.toString() == title.toString())
+            } ?: return false
+        val inputs = action.replyInputs
+        val results = Bundle()
+        for (ri in inputs) results.putCharSequence(ri.resultKey, text)
+        val fillIn = Intent().addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
+        RemoteInput.addResultsToIntent(inputs.toTypedArray(), fillIn, results)
+        RemoteInput.setResultsSource(
+            fillIn,
+            if (fromChoice) RemoteInput.SOURCE_CHOICE else RemoteInput.SOURCE_FREE_FORM_INPUT,
+        )
+        reportActionClick(item, action)
+        // Not onNotificationDirectReplied: with the lifetime-extension refactor it marks the record
+        // FLAG_LIFETIME_EXTENDED_BY_DIRECT_REPLY, and the action click's scheduled cancel then
+        // removes the card 200 ms later unless the app reposts in that window. A mirrored phone
+        // notification is updated or removed by the phone (GB's notify / notify-, often seconds
+        // later), and WatchLink's "Not sent" repost must stay (decision 2026-10-19: no optimistic
+        // removal), so the card is left to the app.
+        return sendInPlace(action.intent, fillIn)
+    }
+
+    private fun reportActionClick(item: CircaNotification, action: CircaAction) {
+        val visibility = visibilityOf(item)
+        bgExecutor.execute {
+            try {
+                barService.onNotificationActionClick(
+                    item.key,
+                    action.index,
+                    action.action,
+                    visibility,
+                    false,
+                )
+            } catch (e: RemoteException) {
+                Log.w(TAG, "onNotificationActionClick failed", e)
+            }
+        }
+    }
+
+    /** PendingIntent.send with SystemUI's background-activity-start grant, as the shade's own. */
+    private fun sendInPlace(intent: PendingIntent, fillIn: Intent?): Boolean {
+        val options =
+            ActivityOptions.makeBasic()
+                .setPendingIntentBackgroundActivityStartMode(
+                    ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
+                )
+        return try {
+            intent.send(context, 0, fillIn, null, null, null, options.toBundle())
+            true
+        } catch (e: PendingIntent.CanceledException) {
+            Log.w(TAG, "action intent cancelled", e)
+            false
+        }
     }
 
     /**

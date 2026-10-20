@@ -16,6 +16,7 @@
 
 package com.android.systemui.circa.shade
 
+import android.app.Activity
 import com.android.systemui.CoreStartable
 import com.android.systemui.qs.tileimpl.QSTileImpl
 import dagger.Binds
@@ -35,6 +36,12 @@ interface CircaShadeModule {
     @IntoMap
     @ClassKey(CircaShadeStartable::class)
     fun bindCircaShadeStartable(startable: CircaShadeStartable): CoreStartable
+
+    /** The notification reply screen (an injected SystemUI activity, like DefaultActivityBinder's). */
+    @Binds
+    @IntoMap
+    @ClassKey(CircaReplyActivity::class)
+    fun bindCircaReplyActivity(activity: CircaReplyActivity): Activity
 
     /** Circa's tiles join SystemUI's tile map (QSFactoryImpl), like the Lineage tiles. */
     @Binds

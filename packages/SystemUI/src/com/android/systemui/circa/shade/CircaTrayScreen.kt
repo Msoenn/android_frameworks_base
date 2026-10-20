@@ -369,21 +369,44 @@ private fun NotificationsPage(
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                     modifier = Modifier.fillMaxSize().testTag("circa_notifications"),
                 ) {
-                    items(items, key = { it.key }) { item ->
-                        NotificationCard(
-                            item = item,
-                            redacted = session.redacted,
-                            nowMillis = now,
-                            colors = colors,
-                            modifier =
-                                Modifier.fillMaxWidth()
-                                    .edgeTransform(listState, item.key, screenHeight),
-                            onOpen = {
-                                notifications.open(item)
-                                close()
-                            },
-                            onDismiss = { notifications.dismiss(item) },
-                        )
+                    for (item in items) {
+                        item(key = item.key) {
+                            NotificationCard(
+                                item = item,
+                                redacted = session.redacted,
+                                nowMillis = now,
+                                colors = colors,
+                                modifier =
+                                    Modifier.fillMaxWidth()
+                                        .edgeTransform(listState, item.key, screenHeight),
+                                onOpen = {
+                                    notifications.open(item)
+                                    close()
+                                },
+                                onDismiss = { notifications.dismiss(item) },
+                            )
+                        }
+                        // Its action buttons, as list items of their own under the card (Wear's
+                        // layout), so each one shrinks into the bezel on its own (edgeTransform).
+                        if (!showsActions(item, session.redacted)) continue
+                        for (action in item.actions) {
+                            val actionKey = "${item.key}#action${action.index}"
+                            item(key = actionKey) {
+                                TrayActionPill(
+                                    action,
+                                    colors,
+                                    Modifier.fillMaxWidth()
+                                        .edgeTransform(listState, actionKey, screenHeight, 20.dp),
+                                ) {
+                                    if (action.isReply) {
+                                        close()
+                                        notifications.openReply(item, action)
+                                    } else if (notifications.invokeAction(item, action)) {
+                                        close()
+                                    }
+                                }
+                            }
+                        }
                     }
                     if (items.any { it.clearable }) {
                         item(key = CLEAR_ALL_KEY) {
@@ -1141,7 +1164,8 @@ private fun EditAction(
 /**
  * One notification card in stock's shape (Wear Material 3 AppCard): app icon, app name and age on
  * the first line, the title in the accent colour and up to two lines of text. Tap opens it; a
- * horizontal swipe dismisses it unless it is not clearable (ongoing).
+ * horizontal swipe dismisses it unless it is not clearable (ongoing). Its action buttons are list
+ * items of their own under it ([TrayActionPill]).
  */
 @Composable
 private fun NotificationCard(

@@ -104,6 +104,9 @@ import kotlinx.coroutines.launch
  * filtered by Do Not Disturb (`matchesInterruptionFilter` / the peek-suppressed visual effect).
  * Content is redacted like the tray's while a secure keyguard is showing.
  *
+ * A notification with actions gets a taller card with up to two buttons ([HeadsUpActions]); hidden
+ * while redacted, except a call's Accept / Reject. A reply button opens [CircaReplyActivity].
+ *
  * Its own window (not the tray's) so it never takes focus from the app under it.
  */
 @SysUISingleton
@@ -119,11 +122,18 @@ constructor(
     @Main private val mainExecutor: Executor,
 ) {
     /** One showing of the card; a new id restarts the slide-in and the timer. */
-    private data class Peek(val id: Int, val item: CircaNotification, val redacted: Boolean, val accent: Color)
+    private data class Peek(val id: Int, val item: CircaNotification, val redacted: Boolean, val accent: Color) {
+        val withActions: Boolean
+            get() = showsActions(item, redacted)
+
+        val cardHeightDp: Int
+            get() = if (withActions) CARD_HEIGHT_ACTIONS_DP else CARD_HEIGHT_DP
+    }
 
     private val peek = mutableStateOf<Peek?>(null)
     private var counter = 0
     private var root: RootView? = null
+    private var rootParams: WindowManager.LayoutParams? = null
     private val lastPeekMillis = HashMap<String, Long>()
 
     private val listener =
@@ -198,9 +208,20 @@ constructor(
 
     private fun show(p: Peek) {
         val view = root ?: createWindow().also { root = it }
+        // The window is only as tall as the card, so the app under it keeps the rest of the screen.
+        rootParams?.let { lp ->
+            val h = windowHeightPx(p.cardHeightDp)
+            if (lp.height != h) {
+                lp.height = h
+                windowManager.updateViewLayout(view, lp)
+            }
+        }
         peek.value = p
         view.visibility = View.VISIBLE
     }
+
+    private fun windowHeightPx(cardHeightDp: Int): Int =
+        (scale() * (cardHeightDp + BOTTOM_MARGIN_DP + 6)).roundToInt()
 
     fun hide() {
         if (peek.value == null) return
@@ -216,7 +237,7 @@ constructor(
         val lp =
             WindowManager.LayoutParams(
                     WindowManager.LayoutParams.MATCH_PARENT,
-                    (scale() * WINDOW_HEIGHT_DP).roundToInt(),
+                    windowHeightPx(CARD_HEIGHT_DP),
                     WindowManager.LayoutParams.TYPE_NAVIGATION_BAR_PANEL,
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
                         WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
@@ -234,6 +255,7 @@ constructor(
                     setTrustedOverlay()
                 }
         windowManager.addView(view, lp)
+        rootParams = lp
         return view
     }
 
@@ -259,6 +281,14 @@ constructor(
                                             tray.open(CircaTray.Page.NOTIFICATIONS)
                                         },
                                         onGone = ::hide,
+                                        onAction = { action ->
+                                            hide()
+                                            if (action.isReply) {
+                                                notifications.openReply(p.item, action)
+                                            } else {
+                                                notifications.invokeAction(p.item, action)
+                                            }
+                                        },
                                         trayOpen = { tray.isOpen },
                                     )
                                 }
@@ -286,13 +316,14 @@ constructor(
         onOpen: () -> Unit,
         onOpenTray: () -> Unit,
         onGone: () -> Unit,
+        onAction: (CircaAction) -> Unit,
         trayOpen: () -> Boolean,
     ) {
         val colors = remember(peek.accent) { CircaColors(peek.accent) }
         val item = peek.item
         val density = LocalDensity.current
         val scope = rememberCoroutineScope()
-        val hideBelow = with(density) { (CARD_HEIGHT_DP + BOTTOM_MARGIN_DP + 8).dp.toPx() }
+        val hideBelow = with(density) { (peek.cardHeightDp + BOTTOM_MARGIN_DP + 8).dp.toPx() }
         val slide = remember { Animatable(hideBelow) }
         val dragX = remember { Animatable(0f) }
         var touching by remember { mutableStateOf(false) }
@@ -324,7 +355,7 @@ constructor(
                     Modifier.padding(bottom = BOTTOM_MARGIN_DP.dp)
                         .offset { IntOffset(dragX.value.roundToInt(), slide.value.roundToInt()) }
                         .width(CARD_WIDTH_DP.dp)
-                        .height(CARD_HEIGHT_DP.dp)
+                        .height(peek.cardHeightDp.dp)
                         .clip(RoundedCornerShape(CARD_RADIUS_DP.dp))
                         .background(colors.surface)
                         .pointerInput(Unit) {
@@ -422,11 +453,12 @@ constructor(
                             text = it.toString(),
                             color = colors.onSurface,
                             fontSize = 13.sp,
-                            maxLines = 2,
+                            maxLines = if (peek.withActions) 1 else 2,
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
                 }
+                if (peek.withActions) HeadsUpActions(item, colors, onAction)
             }
         }
     }
@@ -436,10 +468,11 @@ constructor(
         const val WIDTH_DP = 200f
         const val CARD_WIDTH_DP = 164
         const val CARD_HEIGHT_DP = 100
+        /** With a row of [HeadsUpActions] (the text is cut to one line then). */
+        const val CARD_HEIGHT_ACTIONS_DP = 128
         const val CARD_RADIUS_DP = 40
         /** The circle is only ~125 dp wide this far up from the bezel; see the corner maths in shade.md. */
         const val BOTTOM_MARGIN_DP = 20
-        const val WINDOW_HEIGHT_DP = CARD_HEIGHT_DP + BOTTOM_MARGIN_DP + 6
         const val SWIPE_UP_DP = 28
         const val SWIPE_DOWN_DP = 24
         const val SWIPE_SIDE_DP = 44
