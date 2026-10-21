@@ -21,6 +21,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.app.ActivityManager
+import android.os.UserManager
 import android.graphics.PixelFormat
 import android.text.format.DateFormat
 import android.view.MotionEvent
@@ -35,6 +37,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
+import com.android.systemui.res.R
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -84,7 +92,19 @@ constructor(
     private val now = mutableLongStateOf(System.currentTimeMillis())
     private val battery = mutableIntStateOf(-1)
     private val charging = androidx.compose.runtime.mutableStateOf(false)
+    private val locked = androidx.compose.runtime.mutableStateOf(false)
     private var root: RootView? = null
+
+    private fun refreshLocked() {
+        locked.value =
+            !context.getSystemService(UserManager::class.java)
+                .isUserUnlocked(ActivityManager.getCurrentUser())
+    }
+
+    private val unlockReceiver =
+        object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) = refreshLocked()
+        }
 
     private val batteryCallback =
         object : BatteryController.BatteryStateChangeCallback {
@@ -108,6 +128,8 @@ constructor(
         val view = root ?: createWindow().also { root = it }
         if (view.visibility == View.VISIBLE) return
         now.longValue = System.currentTimeMillis()
+        refreshLocked()
+        context.registerReceiver(unlockReceiver, IntentFilter(Intent.ACTION_USER_UNLOCKED))
         batteryController.addCallback(batteryCallback)
         context.registerReceiver(
             timeReceiver,
@@ -128,6 +150,9 @@ constructor(
         batteryController.removeCallback(batteryCallback)
         try {
             context.unregisterReceiver(timeReceiver)
+        } catch (_: IllegalArgumentException) {}
+        try {
+            context.unregisterReceiver(unlockReceiver)
         } catch (_: IllegalArgumentException) {}
     }
 
@@ -163,7 +188,7 @@ constructor(
                 ComposeView(context).apply {
                     setContent {
                         CircaTrayDensity {
-                            FaceContent(now.longValue, battery.intValue, charging.value)
+                            FaceContent(now.longValue, battery.intValue, charging.value, locked.value)
                         }
                     }
                 }
@@ -193,7 +218,7 @@ constructor(
 }
 
 @Composable
-private fun FaceContent(timeMillis: Long, batteryLevel: Int, charging: Boolean) {
+private fun FaceContent(timeMillis: Long, batteryLevel: Int, charging: Boolean, bfu: Boolean) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val date = Date(timeMillis)
     val is24 = DateFormat.is24HourFormat(context)
@@ -209,8 +234,14 @@ private fun FaceContent(timeMillis: Long, batteryLevel: Int, charging: Boolean) 
     val dim = Color(0xFFC7C6CD)
     val accent = Color(0xFF8AB4F8)
 
-    Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
+    BoxWithConstraints(
+        Modifier.fillMaxSize().background(Color.Black),
+        contentAlignment = Alignment.Center,
+    ) {
+        // With the unlock hint showing, lift the face a little so the hint fits below the ring.
+        val lift = if (bfu) maxHeight * 0.07f else 0.dp
         Column(
+            modifier = Modifier.offset(y = -lift),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
@@ -256,6 +287,20 @@ private fun FaceContent(timeMillis: Long, batteryLevel: Int, charging: Boolean) 
                 }
             }
         }
+        if (bfu) {
+            Text(
+                stringResource(R.string.circa_unlock_to_connect),
+                color = dim,
+                fontSize = 13.sp,
+                textAlign = TextAlign.Center,
+                modifier =
+                    Modifier.align(Alignment.BottomCenter)
+                        .padding(
+                            bottom = maxHeight * 0.12f,
+                            start = maxWidth * 0.18f,
+                            end = maxWidth * 0.18f,
+                        ),
+            )
+        }
     }
 }
-
