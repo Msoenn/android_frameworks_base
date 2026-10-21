@@ -238,10 +238,7 @@ private fun FaceContent(timeMillis: Long, batteryLevel: Int, charging: Boolean, 
         Modifier.fillMaxSize().background(Color.Black),
         contentAlignment = Alignment.Center,
     ) {
-        // With the unlock hint showing, lift the face a little so the hint fits below the ring.
-        val lift = if (bfu) maxHeight * 0.07f else 0.dp
         Column(
-            modifier = Modifier.offset(y = -lift),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
@@ -286,21 +283,18 @@ private fun FaceContent(timeMillis: Long, batteryLevel: Int, charging: Boolean, 
                     Text("$batteryLevel", color = ink, fontSize = 12.sp)
                 }
             }
-        }
-        if (bfu) {
-            Text(
-                stringResource(R.string.circa_unlock_to_connect),
-                color = dim,
-                fontSize = 13.sp,
-                textAlign = TextAlign.Center,
-                modifier =
-                    Modifier.align(Alignment.BottomCenter)
-                        .padding(
-                            bottom = maxHeight * 0.12f,
-                            start = maxWidth * 0.18f,
-                            end = maxWidth * 0.18f,
-                        ),
-            )
+            // Before the first unlock the phone link can't start: one line under the ring. Inside the centred
+            // column, so the whole face moves up by half a line and nothing overlaps.
+            if (bfu) {
+                androidx.compose.foundation.layout.Spacer(Modifier.size(6.dp))
+                Text(
+                    stringResource(R.string.circa_unlock_to_connect),
+                    color = dim,
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    softWrap = false,
+                )
+            }
         }
     }
 }
