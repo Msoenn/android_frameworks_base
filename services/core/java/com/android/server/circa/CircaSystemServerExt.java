@@ -23,8 +23,8 @@ import android.util.Slog;
 import com.android.internal.os.BackgroundThread;
 
 /**
- * Circa's security features in system_server: auto-reboot after a long lock, Wi-Fi auto-off, the
- * USB data modes and the one-shot privacy defaults migration. Their settings are in
+ * Circa's security features in system_server: auto-reboot after a long lock, Wi-Fi auto-off
+ * (unused, and while the phone is linked), the USB data modes and the one-shot privacy defaults migration. Their settings are in
  * {@link CircaSettings}.
  */
 public final class CircaSystemServerExt {
@@ -43,6 +43,8 @@ public final class CircaSystemServerExt {
                     () -> CircaPrivacyDefaults.migrate(systemContext.getContentResolver()));
             start("auto-reboot", () -> CircaAutoReboot.init(systemContext, bg));
             start("Wi-Fi auto-off", () -> CircaWifiAutoOff.maybeInit(systemContext, bg));
+            start("Wi-Fi off when linked",
+                    () -> CircaWifiLinkedOff.maybeInit(systemContext, bg));
             start("USB guard", () -> CircaUsbPortGuard.maybeInit(systemContext));
         });
     }

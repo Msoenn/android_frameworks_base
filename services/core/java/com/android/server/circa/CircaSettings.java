@@ -40,6 +40,14 @@ public final class CircaSettings {
     public static final long WIFI_AUTO_OFF_MIN_MS = 60L * 1000;
 
     /**
+     * Turn Wi-Fi off, connected or not, after the phone link has been up this long (ms) and the
+     * screen has then stayed off for two minutes; 0 = off.
+     */
+    public static final String WIFI_OFF_WHEN_LINKED_MS = "circa_wifi_off_when_linked_ms";
+    public static final long WIFI_OFF_WHEN_LINKED_DEFAULT_MS = 10L * 60 * 1000;
+    public static final long WIFI_OFF_WHEN_LINKED_MIN_MS = 60L * 1000;
+
+    /**
      * USB data signalling of the charging port: {@link CircaUsbPolicy#MODE_ON},
      * {@link CircaUsbPolicy#MODE_CHARGING_ONLY} or {@link CircaUsbPolicy#MODE_CHARGING_ONLY_WHEN_LOCKED}.
      * Values 1 and 0 keep the meaning of the original on/off toggle.
