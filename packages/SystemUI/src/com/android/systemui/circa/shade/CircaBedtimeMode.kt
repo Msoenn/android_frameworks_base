@@ -230,7 +230,7 @@ constructor(
     private fun onSleepState(asleep: Boolean) {
         Log.i(TAG, "Bedtime: WatchLink says asleep=$asleep")
         if (asleep) {
-            if (Settings.Secure.getInt(cr, KEY_ON_SLEEP, 0) == 0 || isOn()) return
+            if (Settings.Secure.getInt(cr, KEY_ON_SLEEP, 1) == 0 || isOn()) return
             val local = Instant.now().atZone(ZoneId.systemDefault())
             if (!BedtimeSchedule.sleepStartAllowed(local.hour * 60 + local.minute)) return
             set(true, SOURCE_SLEEP)
